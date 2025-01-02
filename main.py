@@ -1,8 +1,13 @@
 from table import Table
-# import os
 
 if __name__ == "__main__":
-    # os.system("clear" if os.name == "posix" else "cls")
-    # print(os.name)
     table = Table()
+    table.print()
+
+    print("═" * 110, end="\n\n")
+    table.play_card(0, [])
+    table.print()
+
+    print("═" * 110, end="\n\n")
+    table.play_card(1, [])
     table.print()
