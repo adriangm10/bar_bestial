@@ -1,6 +1,5 @@
 import unittest
 from collections.abc import Callable, Sequence
-from copy import deepcopy
 from enum import Enum
 from functools import reduce
 from random import sample
@@ -244,7 +243,7 @@ class Table:
             for c in range(num_players)
         ]
 
-        self.hands = [deepcopy(d[:4]) for d in self.decks]
+        self.hands = [d[:4] for d in self.decks]
         self.decks = [d[4:] for d in self.decks]
 
         self.turn = 0
