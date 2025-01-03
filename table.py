@@ -1,3 +1,4 @@
+import unittest
 from collections.abc import Callable, Sequence
 from copy import deepcopy
 from enum import Enum
@@ -45,7 +46,7 @@ class CardType(Enum):
     INFIERNO = 99
 
     @classmethod
-    def to_playable_list(cls) -> list[int]:
+    def playable_list(cls) -> list[int]:
         return [c.value for c in cls if c != cls.CIELO and c != cls.INFIERNO]
 
     def is_recursive(self) -> bool:
@@ -157,6 +158,9 @@ def format_cards(hand: list[Card]) -> list[str]:
 
 class Table:
     def __init__(self, num_players: Literal[2, 3, 4] = 2):
+        if not 2 <= num_players <= 4:
+            raise ValueError("There must be between 2 and 4 players")
+
         self.num_players = num_players
         self.table: TableCards = [None] * 7
         self.table[0] = Card(CardType.CIELO, Color.WHITE)
@@ -164,7 +168,7 @@ class Table:
         self.hell: list[Card] = []
         self.heaven: list[Card] = []
 
-        cardType_list = CardType.to_playable_list()
+        cardType_list = CardType.playable_list()
         cardType_count = len(cardType_list)
         self.decks = [
             [
@@ -209,21 +213,29 @@ class Table:
                 pass
 
         # open heaven and hell doors
-        if all(map(lambda c: c is not None, self.table[1:-1])):
+        if all([c is not None for c in self.table[1:-1]]):
             if self.table[0].card_type == CardType.CIELO:  # type: ignore[union-attr]
                 self.heaven.append(self.table[1])  # type: ignore[arg-type]
                 self.heaven.append(self.table[2])  # type: ignore[arg-type]
                 self.hell.append(self.table[-2])  # type: ignore[arg-type]
                 self.table[-2] = None
-                for i in range(1, 5):
-                    self.table[i] = self.table[i + 1]
+                self.table[1] = None
+                self.table[2] = None
+                self.table[1] = self.table[3]
+                self.table[2] = self.table[4]
+                self.table[3] = None
+                self.table[4] = None
             else:
                 self.heaven.append(self.table[-2])  # type: ignore[arg-type]
                 self.heaven.append(self.table[-3])  # type: ignore[arg-type]
                 self.hell.append(self.table[1])  # type: ignore[arg-type]
                 self.table[1] = None
-                for i in reversed(range(2, 6)):
-                    self.table[i] = self.table[i - 1]
+                self.table[5] = None
+                self.table[4] = None
+                self.table[5] = self.table[3]
+                self.table[4] = self.table[2]
+                self.table[3] = None
+                self.table[2] = None
 
         # draw a card
         if self.decks[self.turn]:
@@ -231,3 +243,50 @@ class Table:
 
         # next turn
         self.turn = (self.turn + 1) % self.num_players
+
+
+class TestTable(unittest.TestCase):
+    def test_play_card(self):
+        table = Table()
+        turn = table.turn
+        card = table.hands[table.turn][0]
+        table.play_card(0, [])
+        self.assertEqual(table.table[1], card)
+        self.assertEqual(len(table.hands[turn]), 4)
+
+    def test_play_card_empty_deck(self):
+        table = Table()
+        turn = table.turn
+        card = table.hands[table.turn][0]
+        table.decks[turn] = []
+        table.play_card(0, [])
+        self.assertEqual(table.table[1], card)
+        self.assertEqual(len(table.hands[turn]), 3)
+
+    def test_play_card_changed_entrance(self):
+        table = Table()
+        turn = table.turn
+        table.table[0] = Card(CardType.INFIERNO, Color.WHITE)
+        table.table[-1] = Card(CardType.CIELO, Color.WHITE)
+        card = table.hands[table.turn][0]
+        table.play_card(0, [])
+        self.assertEqual(table.table[-2], card)
+        self.assertEqual(len(table.hands[turn]), 4)
+
+    def test_play_card_open_doors(self):
+        table = Table()
+        table_cards = [
+            Card(CardType.LEON, Color.GREEN),
+            Card(CardType.HIPOPOTAMO, Color.YELLOW),
+            Card(CardType.COCODRILO, Color.GREEN),
+            Card(CardType.COCODRILO, Color.YELLOW),
+        ]
+        table.table[1] = table_cards[0]
+        table.table[2] = table_cards[1]
+        table.table[3] = table_cards[2]
+        table.table[4] = table_cards[3]
+        hell_card = table.hands[table.turn][0]
+        table.play_card(0, [])
+        self.assertEqual(table.heaven, table_cards[:2])
+        self.assertEqual(table.hell, [hell_card])
+        self.assertEqual(table.table[1:-1], table_cards[2:] + [None, None, None])
