@@ -4,12 +4,11 @@ from copy import deepcopy
 from enum import Enum
 from functools import reduce
 from random import sample
-from typing import Annotated, Literal
+from typing import Annotated, Literal, Self
 
 from termcolor import colored
 
-type Hand = Annotated[list[Card], 4]
-type TableCards = Annotated[list[Card | None], 7]
+type TableCards = Annotated[list[Card | None], 5]
 type Actions = list[int]
 type Hell = list[Card]
 type Heaven = list[Card]
@@ -46,8 +45,43 @@ class CardType(Enum):
     INFIERNO = 99
 
     @classmethod
-    def playable_list(cls) -> list[int]:
-        return [c.value for c in cls if c != cls.CIELO and c != cls.INFIERNO]
+    def playable_list(cls) -> list[Self]:
+        return [c for c in cls if c != cls.CIELO and c != cls.INFIERNO]
+
+    @classmethod
+    def leon_action(
+        cls,
+        card_pos: int,
+        cards: TableCards,
+        hell: Hell,
+        heaven: Heaven,
+        actions: Actions,
+    ) -> tuple[TableCards, Hell, Heaven]:
+        if cards[card_pos] is None or cards[card_pos].card_type != cls.LEON:  # type: ignore[union-attr]
+            raise ValueError("cards[card_pos] can't be None")
+
+        card: Card = cards[card_pos]  # type: ignore[assignment]
+        cards[card_pos] = None
+
+        if any([c and c.card_type == cls.LEON for c in cards[:card_pos]]):
+            hell.append(card)
+            cards[card_pos] = None
+            return cards, hell, heaven
+
+        for i in reversed(range(5)):
+            c: Card = cards[i]  # type: ignore[assignment]
+            if c and c.card_type == CardType.MONO:
+                hell.append(c)
+                cards[i] = None
+                if i < 4 and cards[i + 1]:
+                    cards[i] = cards[i + 1]
+                    cards[i + 1] = None
+
+        for i in reversed(range(4)):
+            cards[i + 1] = cards[i]
+        cards[0] = card
+
+        return cards, hell, heaven
 
     def is_recursive(self) -> bool:
         match self:
@@ -101,40 +135,21 @@ class Card:
             colored(bot_border, color),  # type: ignore[arg-type]
         ]
 
-    # def leon_function(
-    #     self, cards: TableCards, hell: Hell, heaven: Heaven, actions: Actions
-    # ) -> tuple[TableCards, Hell, Heaven]:
-    #     # change the way to search other lions
-    #     if self in cards:
-    #         hell.append(self)
-    #         return cards, hell, heaven
-
-    #     for i in reversed(range(5)):
-    #         card = cards[i]
-    #         if card and card.card_type == CardType.MONO:
-    #             hell.append(card)
-    #             cards[i] = None
-    #             if i < 4 and cards[i + 1]:
-    #                 cards[i] = cards[i + 1]
-    #                 cards[i + 1] = None
-
-    #     for i in reversed(range(4)):
-    #         cards[i + 1] = cards[i]
-    #     cards[0] = self
-
-    #     return cards, hell, heaven
-
-    # def act(
-    #     self, cards: TableCards, hell: Hell, heaven: Heaven, actions: Actions
-    # ) -> tuple[TableCards, Hell, Heaven]:
-    #     match self.card_type:
-    #         case CardType.LEON:
-    #             return self.leon_function(cards, hell, heaven, actions)
-    #         case _:
-    #             raise NotImplementedError
+    def function(self) -> CardFunction:
+        match self.card_type:
+            case CardType.LEON:
+                return CardType.leon_action
+            case _:
+                raise NotImplementedError
 
     def __eq__(self, o):
         return self.value == o.value and self.color == o.color
+
+    def __str__(self):
+        return "[" + self.card_type.name + ", " + self.color.name + "]"
+
+    def __repr__(self):
+        return "[" + self.card_type.name + ", " + self.color.name + "]"
 
 
 def blank_card() -> list[str]:
@@ -162,23 +177,20 @@ class Table:
             raise ValueError("There must be between 2 and 4 players")
 
         self.num_players = num_players
-        self.table: TableCards = [None] * 7
-        self.table[0] = Card(CardType.CIELO, Color.WHITE)
-        self.table[-1] = Card(CardType.INFIERNO, Color.WHITE)
+        self.table: TableCards = [None] * 5
+        # self.table[0] = Card(CardType.CIELO, Color.WHITE)
+        # self.table[-1] = Card(CardType.INFIERNO, Color.WHITE)
         self.hell: list[Card] = []
         self.heaven: list[Card] = []
 
         cardType_list = CardType.playable_list()
         cardType_count = len(cardType_list)
         self.decks = [
-            [
-                Card(CardType(ct), Color(c))
-                for ct in sample(cardType_list, cardType_count)
-            ]
+            [Card(ct, Color(c)) for ct in sample(cardType_list, cardType_count)]
             for c in range(num_players)
         ]
 
-        self.hands: list[Hand] = [deepcopy(d[:4]) for d in self.decks]
+        self.hands = [deepcopy(d[:4]) for d in self.decks]
         self.decks = [d[4:] for d in self.decks]
 
         self.turn = 0
@@ -193,18 +205,16 @@ class Table:
     def play_card(self, card_idx: int, actions: Actions):
         card = self.hands[self.turn].pop(card_idx)
 
-        if self.table[0].card_type == CardType.CIELO:  # type: ignore[union-attr]
-            for i, c in enumerate(self.table):
-                if c is None:
-                    self.table[i] = card
-                    break
-        else:
-            for i, c in reversed(list(enumerate(self.table))):
-                if c is None:
-                    self.table[i] = card
-                    break
+        for i, c in enumerate(self.table):
+            if c is None:
+                self.table[i] = card
+                break
 
         # execute card
+        # f = card.function()
+        # self.table, self.hell, self.heaven = f(
+        #     i, self.table, self.hell, self.heaven, actions
+        # )
         # ======
 
         # execute recurrent cards
@@ -213,29 +223,15 @@ class Table:
                 pass
 
         # open heaven and hell doors
-        if all([c is not None for c in self.table[1:-1]]):
-            if self.table[0].card_type == CardType.CIELO:  # type: ignore[union-attr]
-                self.heaven.append(self.table[1])  # type: ignore[arg-type]
-                self.heaven.append(self.table[2])  # type: ignore[arg-type]
-                self.hell.append(self.table[-2])  # type: ignore[arg-type]
-                self.table[-2] = None
-                self.table[1] = None
-                self.table[2] = None
-                self.table[1] = self.table[3]
-                self.table[2] = self.table[4]
-                self.table[3] = None
-                self.table[4] = None
-            else:
-                self.heaven.append(self.table[-2])  # type: ignore[arg-type]
-                self.heaven.append(self.table[-3])  # type: ignore[arg-type]
-                self.hell.append(self.table[1])  # type: ignore[arg-type]
-                self.table[1] = None
-                self.table[5] = None
-                self.table[4] = None
-                self.table[5] = self.table[3]
-                self.table[4] = self.table[2]
-                self.table[3] = None
-                self.table[2] = None
+        if all([c is not None for c in self.table]):
+            self.heaven.append(self.table[0])  # type: ignore[arg-type]
+            self.heaven.append(self.table[1])  # type: ignore[arg-type]
+            self.hell.append(self.table[4])  # type: ignore[arg-type]
+            self.table[4] = None
+            self.table[0] = self.table[2]
+            self.table[1] = self.table[3]
+            self.table[2] = None
+            self.table[3] = None
 
         # draw a card
         if self.decks[self.turn]:
@@ -249,10 +245,13 @@ class TestTable(unittest.TestCase):
     def test_play_card(self):
         table = Table()
         turn = table.turn
-        card = table.hands[table.turn][0]
+        card = table.hands[turn][0]
+        deck = table.decks[turn].copy()
         table.play_card(0, [])
-        self.assertEqual(table.table[1], card)
+
+        self.assertEqual(table.table[0], card)
         self.assertEqual(len(table.hands[turn]), 4)
+        self.assertEqual(deck[1:], table.decks[turn])
 
     def test_play_card_empty_deck(self):
         table = Table()
@@ -260,18 +259,9 @@ class TestTable(unittest.TestCase):
         card = table.hands[table.turn][0]
         table.decks[turn] = []
         table.play_card(0, [])
-        self.assertEqual(table.table[1], card)
-        self.assertEqual(len(table.hands[turn]), 3)
 
-    def test_play_card_changed_entrance(self):
-        table = Table()
-        turn = table.turn
-        table.table[0] = Card(CardType.INFIERNO, Color.WHITE)
-        table.table[-1] = Card(CardType.CIELO, Color.WHITE)
-        card = table.hands[table.turn][0]
-        table.play_card(0, [])
-        self.assertEqual(table.table[-2], card)
-        self.assertEqual(len(table.hands[turn]), 4)
+        self.assertEqual(table.table[0], card)
+        self.assertEqual(len(table.hands[turn]), 3)
 
     def test_play_card_open_doors(self):
         table = Table()
@@ -281,12 +271,78 @@ class TestTable(unittest.TestCase):
             Card(CardType.COCODRILO, Color.GREEN),
             Card(CardType.COCODRILO, Color.YELLOW),
         ]
-        table.table[1] = table_cards[0]
-        table.table[2] = table_cards[1]
-        table.table[3] = table_cards[2]
-        table.table[4] = table_cards[3]
+        table.table[:4] = table_cards
         hell_card = table.hands[table.turn][0]
         table.play_card(0, [])
+
         self.assertEqual(table.heaven, table_cards[:2])
         self.assertEqual(table.hell, [hell_card])
-        self.assertEqual(table.table[1:-1], table_cards[2:] + [None, None, None])
+        self.assertEqual(table.table, table_cards[2:] + [None, None, None])
+
+
+class TestCardActions(unittest.TestCase):
+    def test_lion_action_no_monkeys(self):
+        table_cards = [
+            Card(CardType.HIPOPOTAMO, Color.YELLOW),
+            Card(CardType.COCODRILO, Color.GREEN),
+            Card(CardType.COCODRILO, Color.YELLOW),
+            None,
+            None,
+        ]
+        hell = []
+        heaven = []
+        table_cards[3] = Card(CardType.LEON, Color.GREEN)
+        cards, hell, heaven = CardType.leon_action(
+            3, table_cards.copy(), hell, heaven, []
+        )
+
+        self.assertEqual(
+            cards, [Card(CardType.LEON, Color.GREEN)] + table_cards[:3] + [None]
+        )
+
+    def test_lion_action_monkeys(self):
+        table_cards = [
+            Card(CardType.HIPOPOTAMO, Color.YELLOW),
+            Card(CardType.MONO, Color.GREEN),
+            Card(CardType.COCODRILO, Color.YELLOW),
+            Card(CardType.MONO, Color.YELLOW),
+            None,
+        ]
+        hell = []
+        heaven = []
+        table_cards[4] = Card(CardType.LEON, Color.GREEN)
+        cards, hell, heaven = CardType.leon_action(
+            4, table_cards.copy(), hell, heaven, []
+        )
+
+        self.assertEqual(
+            cards,
+            [
+                table_cards[4],
+                table_cards[0],
+                table_cards[2],
+                None,
+                None,
+            ],  # leon hipopotamo cocodrilo
+        )
+        self.assertEqual(hell, [table_cards[3], table_cards[1]])
+
+    def test_lion_action_other_lion(self):
+        table_cards = [
+            Card(CardType.LEON, Color.GREEN),
+            Card(CardType.HIPOPOTAMO, Color.YELLOW),
+            Card(CardType.COCODRILO, Color.YELLOW),
+            Card(CardType.MONO, Color.GREEN),
+            None,
+        ]
+        hell = []
+        heaven = []
+        table_cards[3] = Card(CardType.LEON, Color.YELLOW)
+        cards, hell, heaven = CardType.leon_action(
+            3, table_cards.copy(), hell, heaven, []
+        )
+
+        self.assertEqual(
+            cards, table_cards[:3] + [None, None],
+        )
+        self.assertEqual(hell, [table_cards[3]])
