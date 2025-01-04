@@ -60,7 +60,7 @@ class CardType(Enum):
     ) -> tuple[TableCards, Hell, Heaven]:
         if cards[card_pos] is None or cards[card_pos].card_type != cls.LEON:
             raise ValueError(
-                "cards[card_pos] is None or is not of the corresponding type"
+                "cards[card_pos] is None"
             )
 
         card: Card = cards[card_pos]  # type: ignore[assignment]
@@ -95,9 +95,9 @@ class CardType(Enum):
         heaven: Heaven,
         actions: Actions,
     ) -> tuple[TableCards, Hell, Heaven]:
-        if cards[card_pos] is None or cards[card_pos].card_type != cls.HIPOPOTAMO:
+        if cards[card_pos] is None:
             raise ValueError(
-                "cards[card_pos] is None or is not of the corresponding type"
+                "cards[card_pos] is None"
             )
 
         card = cards[card_pos]
@@ -127,9 +127,9 @@ class CardType(Enum):
         heaven: Heaven,
         actions: Actions,
     ) -> tuple[TableCards, Hell, Heaven]:
-        if cards[card_pos] is None or cards[card_pos].card_type != cls.COCODRILO:
+        if cards[card_pos] is None:
             raise ValueError(
-                "cards[card_pos] is None or is not of the corresponding type"
+                "cards[card_pos] is None"
             )
 
         card = cards[card_pos]
