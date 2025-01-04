@@ -259,6 +259,27 @@ class CardType(Enum):
 
         return cards, hell, heaven
 
+    @classmethod
+    def loro_action(
+        cls,
+        card_pos: int,
+        cards: TableCards,
+        hell: Hell,
+        heaven: Heaven,
+        actions: Actions,
+    ) -> tuple[TableCards, Hell, Heaven]:
+        if cards[card_pos] is None:
+            raise ValueError("cards[card_pos] is None")
+        if not actions or cards[actions[0]] is None or actions[0] == card_pos:
+            raise ValueError("invalid action for a loro")
+
+        hell.append(cards[actions[0]])  # type: ignore[arg-type]
+        for i in range(actions[0], card_pos):
+            cards[i] = cards[i + 1]
+
+        cards[card_pos] = None
+        return cards, hell, heaven
+
     def action(self) -> CardFunction:
         match self:
             case CardType.LEON:
@@ -281,6 +302,8 @@ class CardType(Enum):
                 return CardType.mono_action
             case CardType.CANGURO:
                 return CardType.canguro_action
+            case CardType.LORO:
+                return CardType.loro_action
             case _:
                 raise NotImplementedError
 
@@ -812,3 +835,26 @@ class TestCardActions(unittest.TestCase):
             Card(CardType.MONO, Color.YELLOW),
             None,
         ])
+
+    def test_loro(self):
+        table_cards = [
+            Card(CardType.HIPOPOTAMO, Color.YELLOW),
+            Card(CardType.JIRAFA, Color.GREEN),
+            Card(CardType.MONO, Color.YELLOW),
+            Card(CardType.LORO, Color.GREEN),
+            None,
+        ]
+
+        cards, hell, heaven = CardType.loro_action(
+            3, table_cards.copy(), self.hell, self.heaven, [1]
+        )
+
+        # fmt: off
+        self.assertEqual(cards, [
+            Card(CardType.HIPOPOTAMO, Color.YELLOW),
+            Card(CardType.MONO, Color.YELLOW),
+            Card(CardType.LORO, Color.GREEN),
+            None,
+            None
+        ])
+        self.assertEqual(hell, [Card(CardType.JIRAFA, Color.GREEN)])
