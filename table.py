@@ -280,6 +280,31 @@ class CardType(Enum):
         cards[card_pos] = None
         return cards, hell, heaven
 
+    @classmethod
+    def mofeta_action(
+        cls,
+        card_pos: int,
+        cards: TableCards,
+        hell: Hell,
+        heaven: Heaven,
+        actions: Actions,
+    ) -> tuple[TableCards, Hell, Heaven]:
+        if cards[card_pos] is None:
+            raise ValueError("cards[card_pos] is None")
+
+        top1, top2 = 0, 0
+        for c in cards:
+            if c.value > top1:
+                top1, top2 = c.value, top1
+            elif c.value > top2:
+                top2 = c.value
+
+        filtered_cards = [c for c in cards[:card_pos] if c.value < top2 or c.value == CardType.MOFETA.value]
+        hell_cards = [c for c in cards[:card_pos] if c.value >= top2 and c.value != CardType.MOFETA.value]
+        cards = filtered_cards + [cards[card_pos]] + [None] * (BOARD_SIZE - len(filtered_cards) - 1)
+
+        return cards, hell + hell_cards, heaven  # type: ignore[operator]
+
     def action(self) -> CardFunction:
         match self:
             case CardType.LEON:
@@ -304,8 +329,10 @@ class CardType(Enum):
                 return CardType.canguro_action
             case CardType.LORO:
                 return CardType.loro_action
+            case CardType.MOFETA:
+                return CardType.mofeta_action
             case _:
-                raise NotImplementedError
+                raise ValueError("infierno and cielo have no action")
 
     def is_recursive(self) -> bool:
         match self:
@@ -858,3 +885,28 @@ class TestCardActions(unittest.TestCase):
             None
         ])
         self.assertEqual(hell, [Card(CardType.JIRAFA, Color.GREEN)])
+
+    def test_mofeta(self):
+        table_cards = [
+            Card(CardType.COCODRILO, Color.YELLOW),
+            Card(CardType.COCODRILO, Color.BLUE),
+            Card(CardType.CEBRA, Color.RED),
+            Card(CardType.HIPOPOTAMO, Color.GREEN),
+            Card(CardType.MOFETA, Color.YELLOW),
+        ]
+
+        cards, hell, heaven = CardType.mofeta_action(
+            4, table_cards.copy(), self.hell, self.heaven, []
+        )
+
+        # fmt: off
+        self.assertEqual(cards, [
+            Card(CardType.CEBRA, Color.RED),
+            Card(CardType.MOFETA, Color.YELLOW),
+            None, None, None,
+        ])
+        self.assertEqual(hell, [
+            Card(CardType.COCODRILO, Color.YELLOW),
+            Card(CardType.COCODRILO, Color.BLUE),
+            Card(CardType.HIPOPOTAMO, Color.GREEN),
+        ])
