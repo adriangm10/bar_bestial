@@ -148,12 +148,9 @@ class CardType(Enum):
                 cards[i] = None
 
         dist = card_pos - i
-        for j in range(i + 1, card_pos + 1):
-            if j + dist < BOARD_SIZE:
-                cards[j] = cards[j + dist]
-                cards[j + dist] = None
-            else:
-                break
+        for j in range(i + 1, BOARD_SIZE - dist - 1):
+            cards[j] = cards[j + dist]
+            cards[j + dist] = None
 
         cards[i] = card
         return cards, hell, heaven
