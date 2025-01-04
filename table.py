@@ -160,6 +160,20 @@ class CardType(Enum):
     ) -> tuple[TableCards, Hell, Heaven]:
         return sorted(cards[: card_pos + 1], reverse=True) + [None] * (BOARD_SIZE - card_pos - 1), hell, heaven  # type: ignore[type-var]
 
+    @classmethod
+    def jirafa_action(
+        cls,
+        card_pos: int,
+        cards: TableCards,
+        hell: Hell,
+        heaven: Heaven,
+        actions: Actions,
+    ) -> tuple[TableCards, Hell, Heaven]:
+        if card_pos > 0 and cards[card_pos - 1] < cards[card_pos]:  # type: ignore[operator]
+            cards[card_pos - 1], cards[card_pos] = cards[card_pos], cards[card_pos - 1]
+
+        return cards, hell, heaven
+
     def is_recursive(self) -> bool:
         match self:
             case (
@@ -553,3 +567,23 @@ class TestCardActions(unittest.TestCase):
             cards,
             [table_cards[2], table_cards[3], table_cards[1], table_cards[0], None],
         )
+
+    def test_jirafa(self):
+        table_cards = [
+            Card(CardType.CAMALEON, Color.GREEN),
+            Card(CardType.MONO, Color.YELLOW),
+            Card(CardType.JIRAFA, Color.GREEN),
+            Card(CardType.SERPIENTE, Color.YELLOW),
+            None,
+        ]
+        cards, hell, heaven = CardType.jirafa_action(
+            2, table_cards.copy(), self.hell, self.heaven, []
+        )
+
+        self.assertEqual(cards, [
+            Card(CardType.CAMALEON, Color.GREEN),
+            Card(CardType.JIRAFA, Color.GREEN),
+            Card(CardType.MONO, Color.YELLOW),
+            Card(CardType.SERPIENTE, Color.YELLOW),
+            None,
+        ])
