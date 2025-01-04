@@ -192,6 +192,43 @@ class CardType(Enum):
         # instead of changing the gates, the queue is inverted
         return cards[card_pos::-1] + [None] * (BOARD_SIZE - card_pos - 1), hell, heaven
 
+    @classmethod
+    def camaleon_action(
+        cls,
+        card_pos: int,
+        cards: TableCards,
+        hell: Hell,
+        heaven: Heaven,
+        actions: Actions,
+    ) -> tuple[TableCards, Hell, Heaven]:
+        if cards[card_pos] is None:
+            raise ValueError("cards[card_pos] is None")
+        if cards[actions[0]] is None:
+            raise ValueError("invalid action, cannot copy action of None")
+
+        f = cards[actions[0]].card_type.action()
+        return f(card_pos, cards, hell, heaven, actions[1:])
+
+    def action(self) -> CardFunction:
+        match self:
+            case CardType.LEON:
+                return CardType.leon_action
+            case CardType.HIPOPOTAMO:
+                return CardType.hipopotamo_action
+            case CardType.COCODRILO:
+                return CardType.cocodrilo_action
+            case CardType.SERPIENTE:
+                return CardType.serpiente_action
+            case CardType.JIRAFA:
+                return CardType.jirafa_action
+            case CardType.CEBRA:
+                return lambda cpos, cs, hell, hevn, acts: (cs, hell, hevn)
+            case CardType.FOCA:
+                return CardType.foca_action
+            case CardType.CAMALEON:
+                return CardType.camaleon_action
+            case _: raise NotImplementedError
+
     def is_recursive(self) -> bool:
         match self:
             case (
@@ -615,5 +652,25 @@ class TestCardActions(unittest.TestCase):
             Card(CardType.JIRAFA, Color.GREEN),
             Card(CardType.MONO, Color.YELLOW),
             Card(CardType.CAMALEON, Color.GREEN),
+            None,
+        ])
+
+    def test_camaleon(self):
+        table_cards = [
+            Card(CardType.HIPOPOTAMO, Color.YELLOW),
+            Card(CardType.JIRAFA, Color.GREEN),
+            Card(CardType.FOCA, Color.YELLOW),
+            Card(CardType.CAMALEON, Color.GREEN),
+            None,
+        ]
+        cards, hell, heaven = CardType.camaleon_action(
+            3, table_cards.copy(), self.hell, self.heaven, [0]
+        )
+
+        self.assertEqual(cards, [
+            Card(CardType.HIPOPOTAMO, Color.YELLOW),
+            Card(CardType.CAMALEON, Color.GREEN),
+            Card(CardType.JIRAFA, Color.GREEN),
+            Card(CardType.FOCA, Color.YELLOW),
             None,
         ])
