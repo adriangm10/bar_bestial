@@ -59,9 +59,7 @@ class CardType(Enum):
         actions: Actions,
     ) -> tuple[TableCards, Hell, Heaven]:
         if cards[card_pos] is None or cards[card_pos].card_type != cls.LEON:
-            raise ValueError(
-                "cards[card_pos] is None"
-            )
+            raise ValueError("cards[card_pos] is None")
 
         card: Card = cards[card_pos]  # type: ignore[assignment]
         cards[card_pos] = None
@@ -96,9 +94,7 @@ class CardType(Enum):
         actions: Actions,
     ) -> tuple[TableCards, Hell, Heaven]:
         if cards[card_pos] is None:
-            raise ValueError(
-                "cards[card_pos] is None"
-            )
+            raise ValueError("cards[card_pos] is None")
 
         card = cards[card_pos]
         cards[card_pos] = None
@@ -128,9 +124,7 @@ class CardType(Enum):
         actions: Actions,
     ) -> tuple[TableCards, Hell, Heaven]:
         if cards[card_pos] is None:
-            raise ValueError(
-                "cards[card_pos] is None"
-            )
+            raise ValueError("cards[card_pos] is None")
 
         card = cards[card_pos]
         cards[card_pos] = None
@@ -154,6 +148,17 @@ class CardType(Enum):
 
         cards[i] = card
         return cards, hell, heaven
+
+    @classmethod
+    def serpiente_action(
+        cls,
+        card_pos: int,
+        cards: TableCards,
+        hell: Hell,
+        heaven: Heaven,
+        actions: Actions,
+    ) -> tuple[TableCards, Hell, Heaven]:
+        return sorted(cards[: card_pos + 1], reverse=True) + [None] * (BOARD_SIZE - card_pos - 1), hell, heaven  # type: ignore[type-var]
 
     def is_recursive(self) -> bool:
         match self:
@@ -530,4 +535,21 @@ class TestCardActions(unittest.TestCase):
                 Card(CardType.JIRAFA, Color.GREEN),
                 Card(CardType.CAMALEON, Color.GREEN),
             ],
+        )
+
+    def test_serpiente(self):
+        table_cards = [
+            Card(CardType.CAMALEON, Color.GREEN),
+            Card(CardType.JIRAFA, Color.GREEN),
+            Card(CardType.COCODRILO, Color.YELLOW),
+            Card(CardType.SERPIENTE, Color.YELLOW),
+            None,
+        ]
+        cards, hell, heaven = CardType.serpiente_action(
+            3, table_cards.copy(), self.hell, self.heaven, []
+        )
+
+        self.assertEqual(
+            cards,
+            [table_cards[2], table_cards[3], table_cards[1], table_cards[0], None],
         )
