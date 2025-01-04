@@ -69,7 +69,7 @@ class CardType(Enum):
             cards[card_pos] = None
             return cards, hell, heaven
 
-        for i in reversed(range(5)):
+        for i in reversed(range(card_pos)):
             c: Card = cards[i]  # type: ignore[assignment]
             if c and c.card_type == CardType.MONO:
                 hell.append(c)
@@ -78,7 +78,7 @@ class CardType(Enum):
                     cards[i] = cards[i + 1]
                     cards[i + 1] = None
 
-        for i in reversed(range(4)):
+        for i in reversed(range(card_pos)):
             cards[i + 1] = cards[i]
         cards[0] = card
 
@@ -101,19 +101,20 @@ class CardType(Enum):
         card = cards[card_pos]
         cards[card_pos] = None
 
-        for i, c in reversed(list(enumerate(cards))):
+        for i, c in reversed(list(enumerate(cards[:card_pos]))):
             if (
                 c is not None
                 and c.card_type != cls.CIELO
                 and c.card_type != cls.INFIERNO
                 and (c.card_type >= cls.HIPOPOTAMO or c.card_type == cls.CEBRA)
             ):
+                i += 1
                 break
 
-        for j in reversed(range(i + 1, 4)):
+        for j in reversed(range(i, card_pos)):
             cards[j + 1] = cards[j]
 
-        cards[i + 1] = card
+        cards[i] = card
         return cards, hell, heaven
 
     def is_recursive(self) -> bool:
@@ -418,4 +419,29 @@ class TestCardActions(unittest.TestCase):
             [table_cards[0]]
             + [Card(CardType.HIPOPOTAMO, Color.YELLOW)]
             + table_cards[1:-1],
+        )
+
+    def test_hipopotamo_middle(self):
+        table_cards = [
+            Card(CardType.COCODRILO, Color.GREEN),
+            Card(CardType.JIRAFA, Color.GREEN),
+            Card(CardType.HIPOPOTAMO, Color.YELLOW),
+            Card(CardType.COCODRILO, Color.YELLOW),
+            None,
+        ]
+        cards, hell, heaven = CardType.hipopotamo_action(
+            2, table_cards.copy(), self.hell, self.heaven, []
+        )
+        table_cards[3] = None
+
+        print(cards)
+        self.assertEqual(
+            cards,
+            [
+                Card(CardType.HIPOPOTAMO, Color.YELLOW),
+                Card(CardType.COCODRILO, Color.GREEN),
+                Card(CardType.JIRAFA, Color.GREEN),
+                Card(CardType.COCODRILO, Color.YELLOW),
+                None
+            ],
         )
