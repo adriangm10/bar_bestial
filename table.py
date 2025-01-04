@@ -174,6 +174,18 @@ class CardType(Enum):
 
         return cards, hell, heaven
 
+    @classmethod
+    def foca_action(
+        cls,
+        card_pos: int,
+        cards: TableCards,
+        hell: Hell,
+        heaven: Heaven,
+        actions: Actions,
+    ) -> tuple[TableCards, Hell, Heaven]:
+        # instead of changing the gates, the queue is inverted
+        return cards[card_pos::-1] + [None] * (BOARD_SIZE - card_pos - 1), hell, heaven
+
     def is_recursive(self) -> bool:
         match self:
             case (
@@ -426,16 +438,14 @@ class TestCardActions(unittest.TestCase):
             4, table_cards.copy(), self.hell, self.heaven, []
         )
 
-        self.assertEqual(
-            cards,
-            [
-                table_cards[4],
-                table_cards[0],
-                table_cards[2],
-                None,
-                None,
-            ],  # leon hipopotamo cocodrilo
-        )
+        # fmt: off
+        self.assertEqual(cards, [
+            table_cards[4],
+            table_cards[0],
+            table_cards[2],
+            None,
+            None,
+        ])  # leon hipopotamo cocodrilo
         self.assertEqual(hell, [table_cards[3], table_cards[1]])
 
     def test_lion_action_other_lion(self):
@@ -490,16 +500,14 @@ class TestCardActions(unittest.TestCase):
             2, table_cards.copy(), self.hell, self.heaven, []
         )
 
-        self.assertEqual(
-            cards,
-            [
-                Card(CardType.HIPOPOTAMO, Color.YELLOW),
-                Card(CardType.COCODRILO, Color.GREEN),
-                Card(CardType.JIRAFA, Color.GREEN),
-                Card(CardType.COCODRILO, Color.YELLOW),
-                None,
-            ],
-        )
+        # fmt: off
+        self.assertEqual(cards, [
+            Card(CardType.HIPOPOTAMO, Color.YELLOW),
+            Card(CardType.COCODRILO, Color.GREEN),
+            Card(CardType.JIRAFA, Color.GREEN),
+            Card(CardType.COCODRILO, Color.YELLOW),
+            None,
+        ])
 
     def test_cocodrilo_action(self):
         table_cards = [
@@ -535,21 +543,15 @@ class TestCardActions(unittest.TestCase):
             2, table_cards.copy(), self.hell, self.heaven, []
         )
 
-        self.assertEqual(
-            cards,
-            [
-                Card(CardType.COCODRILO, Color.YELLOW),
-                Card(CardType.MONO, Color.YELLOW),
-            ]
-            + [None] * 3,
-        )
-        self.assertEqual(
-            hell,
-            [
-                Card(CardType.JIRAFA, Color.GREEN),
-                Card(CardType.CAMALEON, Color.GREEN),
-            ],
-        )
+        # fmt: off
+        self.assertEqual(cards, [
+            Card(CardType.COCODRILO, Color.YELLOW),
+            Card(CardType.MONO, Color.YELLOW),
+        ] + [None] * 3)
+        self.assertEqual(hell, [
+            Card(CardType.JIRAFA, Color.GREEN),
+            Card(CardType.CAMALEON, Color.GREEN),
+        ])
 
     def test_serpiente(self):
         table_cards = [
@@ -580,10 +582,32 @@ class TestCardActions(unittest.TestCase):
             2, table_cards.copy(), self.hell, self.heaven, []
         )
 
+        # fmt: off
         self.assertEqual(cards, [
             Card(CardType.CAMALEON, Color.GREEN),
             Card(CardType.JIRAFA, Color.GREEN),
             Card(CardType.MONO, Color.YELLOW),
             Card(CardType.SERPIENTE, Color.YELLOW),
+            None,
+        ])
+
+    def test_foca(self):
+        table_cards = [
+            Card(CardType.CAMALEON, Color.GREEN),
+            Card(CardType.MONO, Color.YELLOW),
+            Card(CardType.JIRAFA, Color.GREEN),
+            Card(CardType.FOCA, Color.YELLOW),
+            None,
+        ]
+        cards, hell, heaven = CardType.foca_action(
+            3, table_cards.copy(), self.hell, self.heaven, []
+        )
+
+        # fmt: off
+        self.assertEqual(cards, [
+            Card(CardType.FOCA, Color.YELLOW),
+            Card(CardType.JIRAFA, Color.GREEN),
+            Card(CardType.MONO, Color.YELLOW),
+            Card(CardType.CAMALEON, Color.GREEN),
             None,
         ])
