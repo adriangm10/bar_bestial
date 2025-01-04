@@ -203,8 +203,8 @@ class CardType(Enum):
     ) -> tuple[TableCards, Hell, Heaven]:
         if cards[card_pos] is None:
             raise ValueError("cards[card_pos] is None")
-        if cards[actions[0]] is None:
-            raise ValueError("invalid action, cannot copy action of None")
+        if not actions or cards[actions[0]] is None:
+            raise ValueError("invalid action for a camaleon")
 
         f = cards[actions[0]].card_type.action()
         return f(card_pos, cards, hell, heaven, actions[1:])
@@ -237,6 +237,28 @@ class CardType(Enum):
 
         return cards, hell, heaven
 
+    @classmethod
+    def canguro_action(
+        cls,
+        card_pos: int,
+        cards: TableCards,
+        hell: Hell,
+        heaven: Heaven,
+        actions: Actions,
+    ) -> tuple[TableCards, Hell, Heaven]:
+        if cards[card_pos] is None:
+            raise ValueError("cards[card_pos] is None")
+        if not actions or not 0 < actions[0] <= 2:
+            raise ValueError("Invalid action for canguro")
+
+        if card_pos - actions[0] >= 0:
+            card = cards[card_pos]
+            for i in reversed(range(card_pos - actions[0], card_pos)):
+                cards[i + 1] = cards[i]
+            cards[card_pos - actions[0]] = card
+
+        return cards, hell, heaven
+
     def action(self) -> CardFunction:
         match self:
             case CardType.LEON:
@@ -257,6 +279,8 @@ class CardType(Enum):
                 return CardType.camaleon_action
             case CardType.MONO:
                 return CardType.mono_action
+            case CardType.CANGURO:
+                return CardType.canguro_action
             case _:
                 raise NotImplementedError
 
@@ -744,3 +768,47 @@ class TestCardActions(unittest.TestCase):
             None,
         ])
         self.assertEqual(hell, [Card(CardType.HIPOPOTAMO, Color.YELLOW)])
+
+    def test_canguro(self):
+        table_cards = [
+            Card(CardType.HIPOPOTAMO, Color.YELLOW),
+            Card(CardType.JIRAFA, Color.GREEN),
+            Card(CardType.MONO, Color.YELLOW),
+            Card(CardType.CANGURO, Color.GREEN),
+            None,
+        ]
+
+        cards, hell, heaven = CardType.canguro_action(
+            3, table_cards.copy(), self.hell, self.heaven, [1]
+        )
+
+        # fmt: off
+        self.assertEqual(cards, [
+            Card(CardType.HIPOPOTAMO, Color.YELLOW),
+            Card(CardType.JIRAFA, Color.GREEN),
+            Card(CardType.CANGURO, Color.GREEN),
+            Card(CardType.MONO, Color.YELLOW),
+            None,
+        ])
+
+    def test_canguro2(self):
+        table_cards = [
+            Card(CardType.HIPOPOTAMO, Color.YELLOW),
+            Card(CardType.JIRAFA, Color.GREEN),
+            Card(CardType.MONO, Color.YELLOW),
+            Card(CardType.CANGURO, Color.GREEN),
+            None,
+        ]
+
+        cards, hell, heaven = CardType.canguro_action(
+            3, table_cards.copy(), self.hell, self.heaven, [2]
+        )
+
+        # fmt: off
+        self.assertEqual(cards, [
+            Card(CardType.HIPOPOTAMO, Color.YELLOW),
+            Card(CardType.CANGURO, Color.GREEN),
+            Card(CardType.JIRAFA, Color.GREEN),
+            Card(CardType.MONO, Color.YELLOW),
+            None,
+        ])
