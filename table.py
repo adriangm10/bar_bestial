@@ -209,6 +209,34 @@ class CardType(Enum):
         f = cards[actions[0]].card_type.action()
         return f(card_pos, cards, hell, heaven, actions[1:])
 
+    @classmethod
+    def mono_action(
+        cls,
+        card_pos: int,
+        cards: TableCards,
+        hell: Hell,
+        heaven: Heaven,
+        actions: Actions,
+    ) -> tuple[TableCards, Hell, Heaven]:
+        if cards[card_pos] is None:
+            raise ValueError("cards[card_pos] is None")
+
+        if any([c.card_type == cls.MONO for c in cards[:card_pos]]):
+            new_board = []
+            for c in cards[: card_pos + 1]:
+                if c.card_type == cls.COCODRILO or c.card_type == cls.HIPOPOTAMO:
+                    hell.append(c)  # type: ignore[arg-type]
+                else:
+                    new_board.append(c)
+
+            # fmt: off
+            new_board = [c for c in reversed(new_board) if c.card_type == cls.MONO] + list(
+                filter(lambda c: c.card_type != cls.MONO, new_board)  # type: ignore[arg-type]
+            )
+            cards = new_board + [None] * (BOARD_SIZE - len(new_board))
+
+        return cards, hell, heaven
+
     def action(self) -> CardFunction:
         match self:
             case CardType.LEON:
@@ -227,7 +255,10 @@ class CardType(Enum):
                 return CardType.foca_action
             case CardType.CAMALEON:
                 return CardType.camaleon_action
-            case _: raise NotImplementedError
+            case CardType.MONO:
+                return CardType.mono_action
+            case _:
+                raise NotImplementedError
 
     def is_recursive(self) -> bool:
         match self:
@@ -667,10 +698,49 @@ class TestCardActions(unittest.TestCase):
             3, table_cards.copy(), self.hell, self.heaven, [0]
         )
 
+        # fmt: off
         self.assertEqual(cards, [
             Card(CardType.HIPOPOTAMO, Color.YELLOW),
             Card(CardType.CAMALEON, Color.GREEN),
             Card(CardType.JIRAFA, Color.GREEN),
             Card(CardType.FOCA, Color.YELLOW),
+            None
+        ])
+
+    def test_mono_nothing(self):
+        table_cards = [
+            Card(CardType.HIPOPOTAMO, Color.YELLOW),
+            Card(CardType.JIRAFA, Color.GREEN),
+            Card(CardType.FOCA, Color.YELLOW),
+            Card(CardType.MONO, Color.GREEN),
+            None,
+        ]
+
+        cards, hell, heaven = CardType.mono_action(
+            3, table_cards.copy(), self.hell, self.heaven, []
+        )
+
+        self.assertEqual(cards, table_cards)
+
+    def test_mono_2(self):
+        table_cards = [
+            Card(CardType.HIPOPOTAMO, Color.YELLOW),
+            Card(CardType.JIRAFA, Color.GREEN),
+            Card(CardType.MONO, Color.YELLOW),
+            Card(CardType.MONO, Color.GREEN),
+            None,
+        ]
+
+        cards, hell, heaven = CardType.mono_action(
+            3, table_cards.copy(), self.hell, self.heaven, []
+        )
+
+        # fmt: off
+        self.assertEqual(cards, [
+            Card(CardType.MONO, Color.GREEN),
+            Card(CardType.MONO, Color.YELLOW),
+            Card(CardType.JIRAFA, Color.GREEN),
+            None,
             None,
         ])
+        self.assertEqual(hell, [Card(CardType.HIPOPOTAMO, Color.YELLOW)])
