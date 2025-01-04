@@ -58,7 +58,7 @@ class CardType(Enum):
         heaven: Heaven,
         actions: Actions,
     ) -> tuple[TableCards, Hell, Heaven]:
-        if cards[card_pos] is None or cards[card_pos].card_type != cls.LEON:
+        if cards[card_pos] is None:
             raise ValueError("cards[card_pos] is None")
 
         card: Card = cards[card_pos]  # type: ignore[assignment]
@@ -158,6 +158,8 @@ class CardType(Enum):
         heaven: Heaven,
         actions: Actions,
     ) -> tuple[TableCards, Hell, Heaven]:
+        if cards[card_pos] is None:
+            raise ValueError("cards[card_pos] is None")
         return sorted(cards[: card_pos + 1], reverse=True) + [None] * (BOARD_SIZE - card_pos - 1), hell, heaven  # type: ignore[type-var]
 
     @classmethod
@@ -169,6 +171,8 @@ class CardType(Enum):
         heaven: Heaven,
         actions: Actions,
     ) -> tuple[TableCards, Hell, Heaven]:
+        if cards[card_pos] is None:
+            raise ValueError("cards[card_pos] is None")
         if card_pos > 0 and cards[card_pos - 1] < cards[card_pos]:  # type: ignore[operator]
             cards[card_pos - 1], cards[card_pos] = cards[card_pos], cards[card_pos - 1]
 
@@ -183,6 +187,8 @@ class CardType(Enum):
         heaven: Heaven,
         actions: Actions,
     ) -> tuple[TableCards, Hell, Heaven]:
+        if cards[card_pos] is None:
+            raise ValueError("cards[card_pos] is None")
         # instead of changing the gates, the queue is inverted
         return cards[card_pos::-1] + [None] * (BOARD_SIZE - card_pos - 1), hell, heaven
 
