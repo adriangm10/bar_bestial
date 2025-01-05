@@ -101,9 +101,9 @@ class CardType(Enum):
 
         for i, c in reversed(list(enumerate(cards[:card_pos]))):
             if (
-                c.card_type != cls.CIELO
-                and c.card_type != cls.INFIERNO
-                and (c.card_type >= cls.HIPOPOTAMO or c.card_type == cls.CEBRA)
+                c.card_type == cls.CIELO
+                or c.card_type == cls.INFIERNO
+                or (c.card_type >= cls.HIPOPOTAMO or c.card_type == cls.CEBRA)
             ):
                 i += 1
                 break
@@ -131,9 +131,9 @@ class CardType(Enum):
 
         for i, c in reversed(list(enumerate(cards[:card_pos]))):
             if (
-                c.card_type != cls.CIELO
-                and c.card_type != cls.INFIERNO
-                and (c.card_type >= cls.COCODRILO or c.card_type == cls.CEBRA)
+                c.card_type == cls.CIELO
+                or c.card_type == cls.INFIERNO
+                or (c.card_type >= cls.COCODRILO or c.card_type == cls.CEBRA)
             ):
                 i += 1
                 break
@@ -142,9 +142,10 @@ class CardType(Enum):
                 cards[i] = None
 
         dist = card_pos - i
-        for j in range(i + 1, BOARD_SIZE - dist - 1):
-            cards[j] = cards[j + dist]
-            cards[j + dist] = None
+        if dist > 0:
+            for j in range(i + 1, BOARD_SIZE - dist):
+                cards[j] = cards[j + dist]
+                cards[j + dist] = None
 
         cards[i] = card
         return cards, hell, heaven
