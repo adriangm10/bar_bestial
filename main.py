@@ -1,7 +1,7 @@
-from table import Table
+from table import Game
 
 if __name__ == "__main__":
-    table = Table()
+    table = Game()
     table.print()
 
     print("═" * 110, end="\n\n")

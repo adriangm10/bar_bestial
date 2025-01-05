@@ -440,7 +440,7 @@ def format_cards(hand: list[Card]) -> list[str]:
     )
 
 
-class Table:
+class Game:
     def __init__(self, num_players: Literal[2, 3, 4] = 2):
         if not 2 <= num_players <= 4:
             raise ValueError("There must be between 2 and 4 players")
@@ -511,10 +511,13 @@ class Table:
         # next turn
         self.turn = (self.turn + 1) % self.num_players
 
+    def finished(self) -> bool:
+        pass
 
-class TestTable(unittest.TestCase):
+
+class TestGame(unittest.TestCase):
     def setUp(self):
-        self.table = Table()
+        self.table = Game()
 
     def test_play_card(self):
         turn = self.table.turn
