@@ -16,6 +16,7 @@ type CardFunction = Callable[
     [int, TableCards, Hell, Heaven, Actions], tuple[TableCards, Hell, Heaven]
 ]
 
+
 CARD_WIDTH = 15
 BOARD_SIZE = 5
 
@@ -396,12 +397,8 @@ class Card:
             colored(bot_border, color),  # type: ignore[arg-type]
         ]
 
-    def function(self) -> CardFunction:
-        match self.card_type:
-            case CardType.LEON:
-                return CardType.leon_action
-            case _:
-                raise NotImplementedError
+    def action(self) -> CardFunction:
+        return self.card_type.action()
 
     def __eq__(self, o) -> bool:
         if self.__class__ == o.__class__:
@@ -480,19 +477,21 @@ class Table:
         for i, c in enumerate(self.table_cards):
             if c is None:
                 self.table_cards[i] = card
+                card_pos = i
                 break
 
         # execute card
-        # f = card.function()
-        # self.table, self.hell, self.heaven = f(
-        #     i, self.table, self.hell, self.heaven, actions
-        # )
-        # ======
+        act = card.action()
+        self.table_cards, self.hell, self.heaven = act(
+            card_pos, self.table_cards, self.hell, self.heaven, actions
+        )
 
         # execute recurrent cards
         for i, c in enumerate(self.table_cards):
             if c and card != c and c.recursive:
-                pass
+                self.table_cards, self.hell, self.heaven = c.action()(
+                    i, self.table_cards, self.hell, self.heaven, []
+                )
 
         # open heaven and hell doors
         if all([c is not None for c in self.table_cards]):
@@ -514,42 +513,45 @@ class Table:
 
 
 class TestTable(unittest.TestCase):
-    def test_play_card(self):
-        table = Table()
-        turn = table.turn
-        card = table.hands[turn][0]
-        deck = table.decks[turn].copy()
-        table.play_card(0, [])
+    def setUp(self):
+        self.table = Table()
 
-        self.assertEqual(table.table_cards[0], card)
-        self.assertEqual(len(table.hands[turn]), 4)
-        self.assertEqual(deck[1:], table.decks[turn])
+    def test_play_card(self):
+        turn = self.table.turn
+        card = Card(CardType.MONO, Color(0))
+        deck = self.table.decks[turn].copy()
+        self.table.hands[turn][0] = card
+        self.table.play_card(0, [])
+
+        self.assertEqual(self.table.table_cards[0], card)
+        self.assertEqual(len(self.table.hands[turn]), 4)
+        self.assertEqual(deck[1:], self.table.decks[turn])
 
     def test_play_card_empty_deck(self):
-        table = Table()
-        turn = table.turn
-        card = table.hands[table.turn][0]
-        table.decks[turn] = []
-        table.play_card(0, [])
+        turn = self.table.turn
+        card = Card(CardType.MONO, Color(0))
+        self.table.hands[turn][0] = card
+        self.table.decks[turn] = []
+        self.table.play_card(0, [])
 
-        self.assertEqual(table.table_cards[0], card)
-        self.assertEqual(len(table.hands[turn]), 3)
+        self.assertEqual(self.table.table_cards[0], card)
+        self.assertEqual(len(self.table.hands[turn]), 3)
 
     def test_play_card_open_doors(self):
-        table = Table()
         table_cards = [
             Card(CardType.LEON, Color.GREEN),
             Card(CardType.HIPOPOTAMO, Color.YELLOW),
             Card(CardType.COCODRILO, Color.GREEN),
             Card(CardType.COCODRILO, Color.YELLOW),
         ]
-        table.table_cards[:4] = table_cards
-        hell_card = table.hands[table.turn][0]
-        table.play_card(0, [])
+        self.table.table_cards[:4] = table_cards
+        hell_card = Card(CardType.MONO, Color.GREEN)
+        self.table.hands[self.table.turn][0] = hell_card
+        self.table.play_card(0, [])
 
-        self.assertEqual(table.heaven, table_cards[:2])
-        self.assertEqual(table.hell, [hell_card])
-        self.assertEqual(table.table_cards, table_cards[2:] + [None, None, None])
+        self.assertEqual(self.table.heaven, table_cards[:2])
+        self.assertEqual(self.table.hell, [hell_card])
+        self.assertEqual(self.table.table_cards, table_cards[2:] + [None, None, None])
 
 
 class TestCardActions(unittest.TestCase):
