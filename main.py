@@ -1,13 +1,14 @@
 from table import Game
 
 if __name__ == "__main__":
-    table = Game()
-    table.print()
+    game = Game()
 
-    print("═" * 110, end="\n\n")
-    table.play_card(0, [])
-    table.print()
+    while not game.finished():
+        game.print()
 
-    print("═" * 110, end="\n\n")
-    table.play_card(1, [])
-    table.print()
+        # TODO: change the way to input card actions
+        actions = list(map(int, input(f"Make your action (separated by \",\"): ").split(",")))
+        game.play_card(actions[0], actions[1:])
+
+
+    print(f"Winners colors are: {game.winners()}")
