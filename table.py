@@ -301,6 +301,7 @@ class CardType(Enum):
             elif top1 > c.value > top2:
                 top2 = c.value
 
+        # fmt: off
         filtered_cards = [c for c in cards[:card_pos] if c.value < top2 or c.value == CardType.MOFETA.value]
         hell_cards = [c for c in cards[:card_pos] if c.value >= top2 and c.value != CardType.MOFETA.value]
         cards = filtered_cards + [cards[card_pos]] + [None] * (BOARD_SIZE - len(filtered_cards) - 1)
@@ -512,33 +513,62 @@ class Game:
         self.turn = (self.turn + 1) % self.num_players
 
     def finished(self) -> bool:
-        pass
+        return all([not d and not h for d, h in zip(self.decks, self.hands)])
+
+    def winners(self) -> list[Color]:
+        players_heaven = [
+            [c for c in self.heaven if c.color.value == col]
+            for col in range(self.num_players)
+        ]
+
+        max = 0
+        winners_heaven = []
+        for cards in players_heaven:
+            if len(cards) > max:
+                max = len(cards)
+                winners_heaven = [cards]
+            elif len(cards) == max:
+                winners_heaven.append(cards)
+
+        if len(winners_heaven) == 1:
+            return [winners_heaven[0][0].color]
+
+        min = 999
+        winners = []
+        for w in winners_heaven:
+            if (s := sum([c.value for c in w])) < min:
+                min = s
+                winners = [w[0].color]
+            elif (s := sum([c.value for c in w])) == min:
+                winners.append(w[0].color)
+
+        return winners
 
 
 class TestGame(unittest.TestCase):
     def setUp(self):
-        self.table = Game()
+        self.game = Game()
 
     def test_play_card(self):
-        turn = self.table.turn
+        turn = self.game.turn
         card = Card(CardType.MONO, Color(0))
-        deck = self.table.decks[turn].copy()
-        self.table.hands[turn][0] = card
-        self.table.play_card(0, [])
+        deck = self.game.decks[turn].copy()
+        self.game.hands[turn][0] = card
+        self.game.play_card(0, [])
 
-        self.assertEqual(self.table.table_cards[0], card)
-        self.assertEqual(len(self.table.hands[turn]), 4)
-        self.assertEqual(deck[1:], self.table.decks[turn])
+        self.assertEqual(self.game.table_cards[0], card)
+        self.assertEqual(len(self.game.hands[turn]), 4)
+        self.assertEqual(deck[1:], self.game.decks[turn])
 
     def test_play_card_empty_deck(self):
-        turn = self.table.turn
+        turn = self.game.turn
         card = Card(CardType.MONO, Color(0))
-        self.table.hands[turn][0] = card
-        self.table.decks[turn] = []
-        self.table.play_card(0, [])
+        self.game.hands[turn][0] = card
+        self.game.decks[turn] = []
+        self.game.play_card(0, [])
 
-        self.assertEqual(self.table.table_cards[0], card)
-        self.assertEqual(len(self.table.hands[turn]), 3)
+        self.assertEqual(self.game.table_cards[0], card)
+        self.assertEqual(len(self.game.hands[turn]), 3)
 
     def test_play_card_open_doors(self):
         table_cards = [
@@ -547,15 +577,57 @@ class TestGame(unittest.TestCase):
             Card(CardType.COCODRILO, Color.GREEN),
             Card(CardType.COCODRILO, Color.YELLOW),
         ]
-        self.table.table_cards[:4] = table_cards
+        self.game.table_cards[:4] = table_cards
         hell_card = Card(CardType.MONO, Color.GREEN)
-        self.table.hands[self.table.turn][0] = hell_card
-        self.table.play_card(0, [])
+        self.game.hands[self.game.turn][0] = hell_card
+        self.game.play_card(0, [])
 
-        self.assertEqual(self.table.heaven, table_cards[:2])
-        self.assertEqual(self.table.hell, [hell_card])
-        self.assertEqual(self.table.table_cards, table_cards[2:] + [None, None, None])
+        self.assertEqual(self.game.heaven, table_cards[:2])
+        self.assertEqual(self.game.hell, [hell_card])
+        self.assertEqual(self.game.table_cards, table_cards[2:] + [None, None, None])
 
+    def test_game_finished(self):
+        self.assertFalse(self.game.finished())
+        self.game.decks = [[] for _ in self.game.decks]
+        self.game.hands = [[] for _ in self.game.hands]
+        self.assertTrue(self.game.finished())
+
+    def test_game_winners_one_winner(self):
+        self.game.heaven = [
+            Card(CardType.LEON, Color(1)),
+            Card(CardType.COCODRILO, Color(1)),
+            Card(CardType.MOFETA, Color(1)),
+            Card(CardType.JIRAFA, Color(1)),
+            Card(CardType.LEON, Color(0)),
+            Card(CardType.HIPOPOTAMO, Color(0)),
+        ]
+        self.assertEqual(self.game.winners(), [Color(1)])
+
+    def test_game_winners_draw(self):
+        self.game.heaven = [
+            Card(CardType.LEON, Color(1)),
+            Card(CardType.COCODRILO, Color(1)),
+            Card(CardType.MOFETA, Color(1)),
+            Card(CardType.JIRAFA, Color(1)),
+            Card(CardType.LEON, Color(0)),
+            Card(CardType.COCODRILO, Color(0)),
+            Card(CardType.MOFETA, Color(0)),
+            Card(CardType.JIRAFA, Color(0)),
+        ]
+        self.assertEqual(self.game.winners(), [Color(0), Color(1)])
+
+    def test_game_winners_draw_in_num_of_cards(self):
+        self.game.heaven = [
+            Card(CardType.LEON, Color(1)),
+            Card(CardType.COCODRILO, Color(1)),
+            Card(CardType.MOFETA, Color(1)),
+            Card(CardType.JIRAFA, Color(1)),
+            Card(CardType.LEON, Color(0)),
+            Card(CardType.MONO, Color(0)),
+            Card(CardType.MOFETA, Color(0)),
+            Card(CardType.JIRAFA, Color(0)),
+        ]
+        self.assertEqual(self.game.winners(), [Color(0)])
 
 class TestCardActions(unittest.TestCase):
     def setUp(self):
