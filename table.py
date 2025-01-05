@@ -100,6 +100,7 @@ class CardType(Enum):
         card = cards[card_pos]
         cards[card_pos] = None
 
+        i = 0
         for i, c in reversed(list(enumerate(cards[:card_pos]))):
             if (
                 c.card_type == cls.CIELO
@@ -130,6 +131,7 @@ class CardType(Enum):
         card = cards[card_pos]
         cards[card_pos] = None
 
+        i = 0
         for i, c in reversed(list(enumerate(cards[:card_pos]))):
             if (
                 c.card_type == cls.CIELO
@@ -295,7 +297,7 @@ class CardType(Enum):
             raise ValueError("cards[card_pos] is None")
 
         top1, top2 = 0, 0
-        for c in cards:
+        for c in cards[:card_pos]:
             if c.value > top1:
                 top1, top2 = c.value, top1
             elif top1 > c.value > top2:
