@@ -296,7 +296,7 @@ class CardType(Enum):
         for c in cards:
             if c.value > top1:
                 top1, top2 = c.value, top1
-            elif c.value > top2:
+            elif top1 > c.value > top2:
                 top2 = c.value
 
         filtered_cards = [c for c in cards[:card_pos] if c.value < top2 or c.value == CardType.MOFETA.value]
