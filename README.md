@@ -8,5 +8,5 @@ python3 main.py
 to execute the tests:
 
 ```
-python3 -m unittest -v table.py
+python3 -m unittest -v bar.py
 ```
