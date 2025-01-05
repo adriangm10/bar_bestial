@@ -205,6 +205,8 @@ class CardType(Enum):
         heaven: Heaven,
         actions: Actions,
     ) -> tuple[TableCards, Hell, Heaven]:
+        if card_pos == 0:
+            return cards, hell, heaven
         if cards[card_pos] is None:
             raise ValueError("cards[card_pos] is None")
         if not actions or cards[actions[0]] is None:
@@ -250,6 +252,8 @@ class CardType(Enum):
         heaven: Heaven,
         actions: Actions,
     ) -> tuple[TableCards, Hell, Heaven]:
+        if card_pos == 0:
+            return cards, hell, heaven
         if cards[card_pos] is None:
             raise ValueError("cards[card_pos] is None")
         if not actions or not 0 < actions[0] <= 2:
@@ -272,6 +276,8 @@ class CardType(Enum):
         heaven: Heaven,
         actions: Actions,
     ) -> tuple[TableCards, Hell, Heaven]:
+        if card_pos == 0:
+            return cards, hell, heaven
         if cards[card_pos] is None:
             raise ValueError("cards[card_pos] is None")
         if not actions or cards[actions[0]] is None or actions[0] == card_pos:
