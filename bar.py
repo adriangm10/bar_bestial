@@ -357,6 +357,17 @@ class CardType(Enum):
             case _:
                 return False
 
+    def action_msg(self) -> str | None:
+        match self:
+            case CardType.CAMALEON:
+                return "Select a card to copy"
+            case CardType.CANGURO:
+                return "Select jump length[1|2]"
+            case CardType.LORO:
+                return "Select a card to scare away"
+            case _:
+                return None
+
     def __ge__(self, o) -> bool:
         if self.__class__ == o.__class__:
             return self.value >= o.value
@@ -408,6 +419,9 @@ class Card:
 
     def action(self) -> CardFunction:
         return self.card_type.action()
+
+    def action_msg(self) -> str | None:
+        return self.card_type.action_msg()
 
     def __eq__(self, o) -> bool:
         if self.__class__ == o.__class__:
@@ -491,9 +505,14 @@ class Game:
 
         # execute card
         act = card.action()
-        self.table_cards, self.hell, self.heaven = act(
-            card_pos, self.table_cards, self.hell, self.heaven, actions
-        )
+        try:
+            self.table_cards, self.hell, self.heaven = act(
+                card_pos, self.table_cards, self.hell, self.heaven, actions
+            )
+        except ValueError as e:
+            self.hands[self.turn].insert(card_idx, card)
+            self.table_cards[card_pos] = None
+            raise e
 
         # execute recurrent cards
         for i, c in enumerate(self.table_cards):
