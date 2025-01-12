@@ -205,11 +205,15 @@ class CardType(Enum):
         heaven: Heaven,
         actions: Actions,
     ) -> tuple[TableCards, Hell, Heaven]:
-        if card_pos == 0:
+        if all([c.card_type == cls.CAMALEON for c in cards[:card_pos]]):
             return cards, hell, heaven
         if cards[card_pos] is None:
             raise ValueError("cards[card_pos] is None")
-        if not actions or cards[actions[0]] is None:
+        if (
+            not actions
+            or cards[actions[0]] is None
+            or cards[actions[0]].card_type == cls.CAMALEON
+        ):
             raise ValueError("invalid action for a camaleon")
 
         f = cards[actions[0]].card_type.action()
@@ -655,6 +659,7 @@ class TestGame(unittest.TestCase):
             Card(CardType.JIRAFA, Color(0)),
         ]
         self.assertEqual(self.game.winners(), [Color(0)])
+
 
 class TestCardActions(unittest.TestCase):
     def setUp(self):
