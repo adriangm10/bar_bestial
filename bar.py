@@ -527,6 +527,8 @@ class Game:
 
         # open heaven and hell doors
         if all([c is not None for c in self.table_cards]):
+            print(f"[game] {self.table_cards[0]} and {self.table_cards[1]} enter in heaven")
+            print(f"[game] {self.table_cards[-1]} goes to hell")
             self.heaven.append(self.table_cards[0])  # type: ignore[arg-type]
             self.heaven.append(self.table_cards[1])  # type: ignore[arg-type]
             self.hell.append(self.table_cards[4])  # type: ignore[arg-type]
