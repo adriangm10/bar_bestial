@@ -233,14 +233,14 @@ class CardType(Enum):
 
         if any([c.card_type == cls.MONO for c in cards[:card_pos]]):
             new_board = []
-            for c in cards[: card_pos + 1]:
+            for c in cards[:card_pos]:
                 if c.card_type == cls.COCODRILO or c.card_type == cls.HIPOPOTAMO:
                     hell.append(c)  # type: ignore[arg-type]
                 else:
                     new_board.append(c)
 
             # fmt: off
-            new_board = [c for c in reversed(new_board) if c.card_type == cls.MONO] + list(
+            new_board = [cards[card_pos]] + [c for c in reversed(new_board) if c.card_type == cls.MONO] + list(
                 filter(lambda c: c.card_type != cls.MONO, new_board)  # type: ignore[arg-type]
             )
             cards = new_board + [None] * (BOARD_SIZE - len(new_board))
