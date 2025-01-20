@@ -13,9 +13,7 @@ type TableCards = Annotated[list[Card | None], QUEUE_LEN]
 type Actions = list[int]
 type Hell = list[Card]
 type Heaven = list[Card]
-type CardFunction = Callable[
-    [int, TableCards, Hell, Heaven, Actions], tuple[TableCards, Hell, Heaven]
-]
+type CardFunction = Callable[[int, TableCards, Hell, Heaven, Actions], tuple[TableCards, Hell, Heaven]]
 
 
 CARD_WIDTH = 15
@@ -45,6 +43,14 @@ class CardType(Enum):
     MOFETA = 1
 
     @classmethod
+    def toList(cls):
+        return [c for c in cls]
+
+    @classmethod
+    def basicList(cls):
+        return [c for c in cls if c != cls.CAMALEON and c != cls.CANGURO and c != cls.LORO]
+
+    @classmethod
     def leon_action(
         cls,
         card_pos: int,
@@ -63,7 +69,7 @@ class CardType(Enum):
         if any([c and c.card_type == cls.LEON for c in cards[:card_pos]]):
             hell.append(card)
             cards[card_pos] = None
-            logger.info(f"{card} has gone directly to hell because there was another leon")  # fmt: skip
+            logger.info(f"{card} has gone directly to hell because there was another leon")
             return cards, hell, heaven
 
         for i in reversed(range(card_pos)):
@@ -159,7 +165,7 @@ class CardType(Enum):
         if cards[card_pos] is None:
             logger.error("serpiente_action: the card in cards[card_pos] is none")
             raise ValueError("cards[card_pos] is None")
-        logger.info("serpiente_action: the serpiente orders the queue based on the force of each animal")  # fmt: skip
+        logger.info("serpiente_action: the serpiente orders the queue based on the force of each animal")
         return sorted(cards[: card_pos + 1], reverse=True) + [None] * (QUEUE_LEN - card_pos - 1), hell, heaven  # type: ignore[type-var]
 
     @classmethod
@@ -175,7 +181,7 @@ class CardType(Enum):
             logger.error("jirafa_action: the card in cards[card_pos] is none")
             raise ValueError("cards[card_pos] is None")
         if card_pos > 0 and cards[card_pos - 1] < cards[card_pos]:  # type: ignore[operator]
-            logger.info(f"jirafa_action: the jirafa {cards[card_pos]} passes above the {cards[card_pos - 1]}")  # fmt: skip
+            logger.info(f"jirafa_action: the jirafa {cards[card_pos]} passes above the {cards[card_pos - 1]}")
             cards[card_pos - 1], cards[card_pos] = cards[card_pos], cards[card_pos - 1]
 
         return cards, hell, heaven
@@ -206,16 +212,12 @@ class CardType(Enum):
         actions: Actions,
     ) -> tuple[TableCards, Hell, Heaven]:
         if all([c.card_type == cls.CAMALEON for c in cards[:card_pos]]):
-            logger.info("camaleon_action: there is no card to copy in the queue so the camaleon does nothing")  # fmt:skip
+            logger.info("camaleon_action: there is no card to copy in the queue so the camaleon does nothing")
             return cards, hell, heaven
         if cards[card_pos] is None:
             logger.error("camaleon_action: the card in cards[card_pos] is none")
             raise ValueError("cards[card_pos] is None")
-        if (
-            not actions
-            or cards[actions[0]] is None
-            or cards[actions[0]].card_type == cls.CAMALEON
-        ):
+        if not actions or cards[actions[0]] is None or cards[actions[0]].card_type == cls.CAMALEON:
             logger.error("camaleon_action: invalid actions ({actions}) for a camaleon")
             raise ValueError("invalid action for a camaleon")
 
@@ -328,8 +330,7 @@ class CardType(Enum):
             elif top1 > c.value > top2:
                 top2 = c.value
 
-        logger.info(f"mofeta_action: the {cards[card_pos]} sends {cls(top1).name}s and {cls(top2).name}s to hell")  # fmt: skip
-        # fmt: off
+        logger.info(f"mofeta_action: the {cards[card_pos]} sends {cls(top1).name}s and {cls(top2).name}s to hell")
         filtered_cards = [c for c in cards[:card_pos] if c.value < top2 or c.value == CardType.MOFETA.value]
         hell_cards = [c for c in cards[:card_pos] if c.value >= top2 and c.value != CardType.MOFETA.value]
         cards = filtered_cards + [cards[card_pos]] + [None] * (QUEUE_LEN - len(filtered_cards) - 1)
@@ -365,12 +366,7 @@ class CardType(Enum):
 
     def is_recursive(self) -> bool:
         match self:
-            case (
-                CardType.HIPOPOTAMO
-                | CardType.COCODRILO
-                | CardType.JIRAFA
-                | CardType.CEBRA
-            ):
+            case CardType.HIPOPOTAMO | CardType.COCODRILO | CardType.JIRAFA | CardType.CEBRA:
                 return True
             case _:
                 return False
@@ -389,16 +385,12 @@ class CardType(Enum):
     def __ge__(self, o) -> bool:
         if self.__class__ == o.__class__:
             return self.value >= o.value
-        raise ValueError(
-            "Error comparing " + str(self.__class__) + " with " + str(o.__class__)
-        )
+        raise ValueError("Error comparing " + str(self.__class__) + " with " + str(o.__class__))
 
     def __lt__(self, o) -> bool:
         if self.__class__ == o.__class__:
             return self.value < o.value
-        raise ValueError(
-            "Error comparing " + str(self.__class__) + " with " + str(o.__class__)
-        )
+        raise ValueError("Error comparing " + str(self.__class__) + " with " + str(o.__class__))
 
 
 class Card:
@@ -444,16 +436,12 @@ class Card:
     def __eq__(self, o) -> bool:
         if self.__class__ == o.__class__:
             return self.card_type == o.card_type and self.color == o.color
-        raise ValueError(
-            "Error comparing " + str(self.__class__) + " with " + str(o.__class__)
-        )
+        raise ValueError("Error comparing " + str(self.__class__) + " with " + str(o.__class__))
 
     def __lt__(self, o):
         if self.__class__ == o.__class__:
             return self.card_type < o.card_type
-        raise ValueError(
-            "Error comparing " + str(self.__class__) + " with " + str(o.__class__)
-        )
+        raise ValueError("Error comparing " + str(self.__class__) + " with " + str(o.__class__))
 
     def __str__(self):
         return "<" + self.card_type.name + ", " + self.color.name + ">"
@@ -473,16 +461,18 @@ def blank_card() -> list[str]:
 def format_cards(hand: list[Card]) -> list[str]:
     handr = map(lambda c: c.format() if c else blank_card(), hand)
     return reduce(
-        lambda acc, card: (
-            card if not acc else list(map(lambda x: x[1] + card[x[0]], enumerate(acc)))
-        ),
+        lambda acc, card: (card if not acc else list(map(lambda x: x[1] + card[x[0]], enumerate(acc)))),
         handr,
         [],
     )
 
 
 class Game:
-    def __init__(self, num_players: Literal[2, 3, 4] = 2):
+    def __init__(
+        self,
+        num_players: Literal[2, 3, 4] = 2,
+        game_mode: Literal["basic", "medium", "full"] = "full",
+    ):
         if not 2 <= num_players <= 4:
             raise ValueError("There must be between 2 and 4 players")
 
@@ -491,11 +481,9 @@ class Game:
         self.hell: list[Card] = []
         self.heaven: list[Card] = []
 
+        cardType_list = CardType.basicList() if game_mode == "basic" else CardType.toList()
         cardType_count = len(CardType)
-        self.decks = [
-            [Card(ct, Color(c)) for ct in sample(sorted(CardType), cardType_count)]
-            for c in range(num_players)
-        ]
+        self.decks = [[Card(ct, Color(c)) for ct in sample(cardType_list, cardType_count)] for c in range(num_players)]
 
         self.hands = [d[:4] for d in self.decks]
         self.decks = [d[4:] for d in self.decks]
@@ -522,9 +510,7 @@ class Game:
         # execute card
         act = card.action()
         try:
-            self.table_cards, self.hell, self.heaven = act(
-                card_pos, self.table_cards, self.hell, self.heaven, actions
-            )
+            self.table_cards, self.hell, self.heaven = act(card_pos, self.table_cards, self.hell, self.heaven, actions)
         except ValueError as e:
             self.hands[self.turn].insert(card_idx, card)
             self.table_cards[card_pos] = None
@@ -533,9 +519,7 @@ class Game:
         # execute recurrent cards
         for i, c in enumerate(self.table_cards):
             if c and card != c and c.recursive:
-                self.table_cards, self.hell, self.heaven = c.action()(
-                    i, self.table_cards, self.hell, self.heaven, []
-                )
+                self.table_cards, self.hell, self.heaven = c.action()(i, self.table_cards, self.hell, self.heaven, [])
 
         # open heaven and hell doors
         if all([c is not None for c in self.table_cards]):
@@ -561,10 +545,7 @@ class Game:
         return all([not d and not h for d, h in zip(self.decks, self.hands)])
 
     def winners(self) -> list[Color]:
-        players_heaven = [
-            [c for c in self.heaven if c.color.value == col]
-            for col in range(self.num_players)
-        ]
+        players_heaven = [[c for c in self.heaven if c.color.value == col] for col in range(self.num_players)]
 
         max = 0
         winners_heaven = []
@@ -692,13 +673,9 @@ class TestCardActions(unittest.TestCase):
             None,
         ]
         table_cards[3] = Card(CardType.LEON, Color.GREEN)
-        cards, hell, heaven = CardType.leon_action(
-            3, table_cards.copy(), self.hell, self.heaven, []
-        )
+        cards, hell, heaven = CardType.leon_action(3, table_cards.copy(), self.hell, self.heaven, [])
 
-        self.assertEqual(
-            cards, [Card(CardType.LEON, Color.GREEN)] + table_cards[:3] + [None]
-        )
+        self.assertEqual(cards, [Card(CardType.LEON, Color.GREEN)] + table_cards[:3] + [None])
 
     def test_lion_action_monkeys(self):
         table_cards = [
@@ -709,9 +686,7 @@ class TestCardActions(unittest.TestCase):
             None,
         ]
         table_cards[4] = Card(CardType.LEON, Color.GREEN)
-        cards, hell, heaven = CardType.leon_action(
-            4, table_cards.copy(), self.hell, self.heaven, []
-        )
+        cards, hell, heaven = CardType.leon_action(4, table_cards.copy(), self.hell, self.heaven, [])
 
         # fmt: off
         self.assertEqual(cards, [
@@ -732,9 +707,7 @@ class TestCardActions(unittest.TestCase):
             None,
         ]
         table_cards[3] = Card(CardType.LEON, Color.YELLOW)
-        cards, hell, heaven = CardType.leon_action(
-            3, table_cards.copy(), self.hell, self.heaven, []
-        )
+        cards, hell, heaven = CardType.leon_action(3, table_cards.copy(), self.hell, self.heaven, [])
 
         self.assertEqual(
             cards,
@@ -751,16 +724,12 @@ class TestCardActions(unittest.TestCase):
             None,
         ]
         table_cards[3] = Card(CardType.HIPOPOTAMO, Color.YELLOW)
-        cards, hell, heaven = CardType.hipopotamo_action(
-            3, table_cards.copy(), self.hell, self.heaven, []
-        )
+        cards, hell, heaven = CardType.hipopotamo_action(3, table_cards.copy(), self.hell, self.heaven, [])
         table_cards[3] = None
 
         self.assertEqual(
             cards,
-            [table_cards[0]]
-            + [Card(CardType.HIPOPOTAMO, Color.YELLOW)]
-            + table_cards[1:-1],
+            [table_cards[0]] + [Card(CardType.HIPOPOTAMO, Color.YELLOW)] + table_cards[1:-1],
         )
 
     def test_hipopotamo_middle(self):
@@ -771,9 +740,7 @@ class TestCardActions(unittest.TestCase):
             Card(CardType.COCODRILO, Color.YELLOW),
             None,
         ]
-        cards, hell, heaven = CardType.hipopotamo_action(
-            2, table_cards.copy(), self.hell, self.heaven, []
-        )
+        cards, hell, heaven = CardType.hipopotamo_action(2, table_cards.copy(), self.hell, self.heaven, [])
 
         # fmt: off
         self.assertEqual(cards, [
@@ -793,14 +760,10 @@ class TestCardActions(unittest.TestCase):
             None,
         ]
         table_cards[3] = Card(CardType.COCODRILO, Color.YELLOW)
-        cards, hell, heaven = CardType.cocodrilo_action(
-            3, table_cards.copy(), self.hell, self.heaven, []
-        )
+        cards, hell, heaven = CardType.cocodrilo_action(3, table_cards.copy(), self.hell, self.heaven, [])
         table_cards[3] = None
 
-        self.assertEqual(
-            cards, [table_cards[0], Card(CardType.COCODRILO, Color.YELLOW)] + [None] * 3
-        )
+        self.assertEqual(cards, [table_cards[0], Card(CardType.COCODRILO, Color.YELLOW)] + [None] * 3)
         self.assertEqual(
             hell,
             [Card(CardType.MONO, Color.GREEN), Card(CardType.CAMALEON, Color.YELLOW)],
@@ -814,9 +777,7 @@ class TestCardActions(unittest.TestCase):
             Card(CardType.MONO, Color.YELLOW),
             None,
         ]
-        cards, hell, heaven = CardType.cocodrilo_action(
-            2, table_cards.copy(), self.hell, self.heaven, []
-        )
+        cards, hell, heaven = CardType.cocodrilo_action(2, table_cards.copy(), self.hell, self.heaven, [])
 
         # fmt: off
         self.assertEqual(cards, [
@@ -836,9 +797,7 @@ class TestCardActions(unittest.TestCase):
             Card(CardType.SERPIENTE, Color.YELLOW),
             None,
         ]
-        cards, hell, heaven = CardType.serpiente_action(
-            3, table_cards.copy(), self.hell, self.heaven, []
-        )
+        cards, hell, heaven = CardType.serpiente_action(3, table_cards.copy(), self.hell, self.heaven, [])
 
         self.assertEqual(
             cards,
@@ -853,9 +812,7 @@ class TestCardActions(unittest.TestCase):
             Card(CardType.SERPIENTE, Color.YELLOW),
             None,
         ]
-        cards, hell, heaven = CardType.jirafa_action(
-            2, table_cards.copy(), self.hell, self.heaven, []
-        )
+        cards, hell, heaven = CardType.jirafa_action(2, table_cards.copy(), self.hell, self.heaven, [])
 
         # fmt: off
         self.assertEqual(cards, [
@@ -874,9 +831,7 @@ class TestCardActions(unittest.TestCase):
             Card(CardType.FOCA, Color.YELLOW),
             None,
         ]
-        cards, hell, heaven = CardType.foca_action(
-            3, table_cards.copy(), self.hell, self.heaven, []
-        )
+        cards, hell, heaven = CardType.foca_action(3, table_cards.copy(), self.hell, self.heaven, [])
 
         # fmt: off
         self.assertEqual(cards, [
@@ -895,9 +850,7 @@ class TestCardActions(unittest.TestCase):
             Card(CardType.CAMALEON, Color.GREEN),
             None,
         ]
-        cards, hell, heaven = CardType.camaleon_action(
-            3, table_cards.copy(), self.hell, self.heaven, [0]
-        )
+        cards, hell, heaven = CardType.camaleon_action(3, table_cards.copy(), self.hell, self.heaven, [0])
 
         # fmt: off
         self.assertEqual(cards, [
@@ -917,9 +870,7 @@ class TestCardActions(unittest.TestCase):
             None,
         ]
 
-        cards, hell, heaven = CardType.mono_action(
-            3, table_cards.copy(), self.hell, self.heaven, []
-        )
+        cards, hell, heaven = CardType.mono_action(3, table_cards.copy(), self.hell, self.heaven, [])
 
         self.assertEqual(cards, table_cards)
 
@@ -932,9 +883,7 @@ class TestCardActions(unittest.TestCase):
             None,
         ]
 
-        cards, hell, heaven = CardType.mono_action(
-            3, table_cards.copy(), self.hell, self.heaven, []
-        )
+        cards, hell, heaven = CardType.mono_action(3, table_cards.copy(), self.hell, self.heaven, [])
 
         # fmt: off
         self.assertEqual(cards, [
@@ -955,9 +904,7 @@ class TestCardActions(unittest.TestCase):
             None,
         ]
 
-        cards, hell, heaven = CardType.canguro_action(
-            3, table_cards.copy(), self.hell, self.heaven, [1]
-        )
+        cards, hell, heaven = CardType.canguro_action(3, table_cards.copy(), self.hell, self.heaven, [1])
 
         # fmt: off
         self.assertEqual(cards, [
@@ -977,9 +924,7 @@ class TestCardActions(unittest.TestCase):
             None,
         ]
 
-        cards, hell, heaven = CardType.canguro_action(
-            3, table_cards.copy(), self.hell, self.heaven, [2]
-        )
+        cards, hell, heaven = CardType.canguro_action(3, table_cards.copy(), self.hell, self.heaven, [2])
 
         # fmt: off
         self.assertEqual(cards, [
@@ -999,9 +944,7 @@ class TestCardActions(unittest.TestCase):
             None,
         ]
 
-        cards, hell, heaven = CardType.loro_action(
-            3, table_cards.copy(), self.hell, self.heaven, [1]
-        )
+        cards, hell, heaven = CardType.loro_action(3, table_cards.copy(), self.hell, self.heaven, [1])
 
         # fmt: off
         self.assertEqual(cards, [
@@ -1022,9 +965,7 @@ class TestCardActions(unittest.TestCase):
             Card(CardType.MOFETA, Color.YELLOW),
         ]
 
-        cards, hell, heaven = CardType.mofeta_action(
-            4, table_cards.copy(), self.hell, self.heaven, []
-        )
+        cards, hell, heaven = CardType.mofeta_action(4, table_cards.copy(), self.hell, self.heaven, [])
 
         # fmt: off
         self.assertEqual(cards, [
