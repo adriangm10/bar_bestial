@@ -481,6 +481,7 @@ class Game:
         self.hell: list[Card] = []
         self.heaven: list[Card] = []
 
+        self.game_mode = game_mode
         cardType_list = CardType.basicList() if game_mode == "basic" else CardType.toList()
         cardType_count = len(CardType)
         self.decks = [[Card(ct, Color(c)) for ct in sample(cardType_list, cardType_count)] for c in range(num_players)]
@@ -517,9 +518,10 @@ class Game:
             raise e
 
         # execute recurrent cards
-        for i, c in enumerate(self.table_cards):
-            if c and card != c and c.recursive:
-                self.table_cards, self.hell, self.heaven = c.action()(i, self.table_cards, self.hell, self.heaven, [])
+        if self.game_mode == "full":
+            for i, c in enumerate(self.table_cards):
+                if c and card != c and c.recursive:
+                    self.table_cards, self.hell, self.heaven = c.action()(i, self.table_cards, self.hell, self.heaven, [])
 
         # open heaven and hell doors
         if all([c is not None for c in self.table_cards]):
