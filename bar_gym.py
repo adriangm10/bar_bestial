@@ -40,7 +40,7 @@ class BarEnv(gym.Env):
         hand = [(c.value, int(c.recursive), c.color.value) for c in self.game.hands[self.game.turn]]
         hand += [(-1, -1, -1)] * (4 - len(hand))
 
-        return cards + hand
+        return np.array(cards + hand)
 
     def reset(self, seed: int | None = None, options: dict | None = None):
         super().reset(seed=seed, options=options)
