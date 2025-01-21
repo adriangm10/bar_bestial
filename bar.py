@@ -483,7 +483,7 @@ class Game:
 
         self.game_mode = game_mode
         cardType_list = CardType.basicList() if game_mode == "basic" else CardType.toList()
-        cardType_count = len(CardType)
+        cardType_count = len(cardType_list)
         self.decks = [[Card(ct, Color(c)) for ct in sample(cardType_list, cardType_count)] for c in range(num_players)]
 
         self.hands = [d[:4] for d in self.decks]
@@ -548,6 +548,9 @@ class Game:
 
     def winners(self) -> list[Color]:
         players_heaven = [[c for c in self.heaven if c.color.value == col] for col in range(self.num_players)]
+
+        if all([len(cards) == 0 for cards in players_heaven]):
+            return []
 
         max = 0
         winners_heaven = []
