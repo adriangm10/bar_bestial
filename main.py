@@ -8,7 +8,7 @@ from bar_gym import BarEnv
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
     model = DQN.load("models/dqn_final.zip")
-    env = BarEnv(game_mode="basic", render_mode="human")
+    env = BarEnv(game_mode="basic", render_mode="human", self_play=False)
     obs, _ = env.reset()
 
     while True:

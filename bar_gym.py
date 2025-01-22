@@ -16,6 +16,7 @@ class BarEnv(gym.Env):
         num_players: Literal[2, 3, 4] = 2,
         game_mode: Literal["basic", "medium", "full"] = "full",
         agent_color: Color = Color(0),
+        self_play: bool = True,
         render_mode=None,
     ):
         """
@@ -31,6 +32,7 @@ class BarEnv(gym.Env):
         self.game_mode = game_mode
         self.agent_color = agent_color
         self.opponent_model = opponent_model
+        self.self_play = self_play
 
         self.observation_space = spaces.Box(
             low=np.ones((9, 3)) * -1,
@@ -66,7 +68,7 @@ class BarEnv(gym.Env):
         assert self.action_space.contains(action)
 
         hand_count = len(self.game.hands[self.game.turn])
-        if self.game.turn != self.agent_color.value:
+        if self.game.turn != self.agent_color.value and self.self_play:
             if self.opponent_model:
                 action = self.opponent_model.predict(self.obs)[0]
             else:
