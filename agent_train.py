@@ -1,70 +1,52 @@
 import random
+from copy import deepcopy
 
-from stable_baselines3 import DQN
+from stable_baselines3 import DQN, PPO
 from stable_baselines3.common.callbacks import BaseCallback, EvalCallback
 from stable_baselines3.common.evaluation import evaluate_policy
 
 from bar_gym import BarEnv
 
-# class CustomCallback(BaseCallback):
-#     def __init__(self, verbose: int = 0):
-#         super().__init__(verbose)
-#         self.opponent = DQN("MlpPolicy", env)
-#
-#     def _on_training_start(self) -> None:
-#         """
-#         This method is called before the first rollout starts.
-#         """
-#         pass
-#
-#     def _on_rollout_start(self) -> None:
-#         """
-#         A rollout is the collection of environment interaction
-#         using the current policy.
-#         This event is triggered before collecting new samples.
-#         """
-#         pass
-#
-#     def _on_step(self) -> bool:
-#         """
-#         This method will be called by the model after each call to `env.step()`.
-#
-#         For child callback (of an `EventCallback`), this will be called
-#         when the event is triggered.
-#
-#         :return: If the callback returns False, training is aborted early.
-#         """
-#         if self.n_calls % 1000 == 0:
-#             self.opponent.set_parameters(self.model.get_parameters())  # type: ignore[arg-type]
-#
-#         # self.training_env.step(self.opponent.predict(self.training_env._get_obs()))
-#         return True
-#
-#     def _on_rollout_end(self) -> None:
-#         """
-#         This event is triggered before updating the policy.
-#         """
-#         pass
-#
-#     def _on_training_end(self) -> None:
-#         """
-#         This event is triggered before exiting the `learn()` method.
-#         """
-#         pass
 
+class SelfPlayCallback(BaseCallback):
+    def __init__(self, env: BarEnv, update_after_n_episodes: int = 100, temp_model_path: str = "/tmp/tmp_train_model", verbose: int = 0):
+        super().__init__(verbose)
+        self.env = env
+        self.episodes = 0
+        self.opponent = None
+        self.update_after_n_episodes = update_after_n_episodes
+        self.temp_model_path = temp_model_path
+
+    def _on_step(self) -> bool:
+        """
+        This method will be called by the model after each call to `env.step()`.
+
+        For child callback (of an `EventCallback`), this will be called
+        when the event is triggered.
+
+        :return: If the callback returns False, training is aborted early.
+        """
+
+        if self.locals.get("done") and self.locals["done"]:
+            self.episodes += 1
+
+            if self.episodes % self.update_after_n_episodes == 0:
+                self.model.save(self.temp_model_path)
+                self.env.opponent_model = self.model.__class__.load(self.temp_model_path)
+                if self.verbose > 0:
+                    print(f"Updated opponent model at episode {self.episodes}")
+
+        return True
 
 def model_v_random(model, env, num_games=100):
-    obs, _ = env.reset()
     wins = 0
     losses = 0
     draws = 0
 
     for _ in range(num_games):
+        obs, _ = env.reset()
         while True:
-            if env.game.turn == 0:
-                action = model.predict(obs)[0]
-            else:
-                action = random.randint(0, len(env.game.hands[env.game.turn]) - 1)
+            action = model.predict(obs)[0]
 
             obs, r, terminated, truncated, _ = env.step(action)
             if terminated or truncated:
@@ -79,16 +61,14 @@ def model_v_random(model, env, num_games=100):
     return wins, losses, draws
 
 
-env = BarEnv(game_mode="basic")
-model = DQN("MlpPolicy", env)
-eval_callback = EvalCallback(env, best_model_save_path="models/dqn", eval_freq=5000, n_eval_episodes=1000)
-model.learn(total_timesteps=100_000, callback=eval_callback)
+if __name__ == "__main__":
+    env = BarEnv(game_mode="basic")
+    model = DQN("MlpPolicy", env, verbose=0)
+    # eval_callback = EvalCallback(env, best_model_save_path="models/dqn", eval_freq=5000, n_eval_episodes=1000)
+    model.learn(total_timesteps=1_000_000, callback=SelfPlayCallback(env, update_after_n_episodes=500, verbose=1))
 
-mean_reward, std_reward = evaluate_policy(model, env, n_eval_episodes=200, deterministic=True)
-print(f"mean_reward: {mean_reward}, std_reward: {std_reward}")
+    model.save("models/dqn_final")
 
-model.save("models/dqn_final")
-
-model = DQN.load("models/dqn_final")
-wins, losses, draws = model_v_random(model, BarEnv(game_mode="basic"))
-print(f"wins: {wins}, losses: {losses}, draws: {draws}")
+    model = DQN.load("models/dqn_final")
+    wins, losses, draws = model_v_random(model, BarEnv(game_mode="basic"))
+    print(f"wins: {wins}, losses: {losses}, draws: {draws}")
