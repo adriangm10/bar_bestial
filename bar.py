@@ -4,7 +4,7 @@ import unittest
 from collections.abc import Callable, Sequence
 from enum import Enum
 from functools import reduce
-from random import sample
+from random import randint, sample
 from typing import Annotated, Literal, Self
 
 from termcolor import colored
@@ -330,6 +330,11 @@ class CardType(Enum):
             elif top1 > c.value > top2:
                 top2 = c.value
 
+        if top1 <= 1 and top2 <= 1:
+            return cards, hell, heaven
+        elif top1 > 1 and top2 == 0:
+            top2 = top1
+
         logger.info(f"mofeta_action: the {cards[card_pos]} sends {cls(top1).name}s and {cls(top2).name}s to hell")
         filtered_cards = [c for c in cards[:card_pos] if c.value < top2 or c.value == CardType.MOFETA.value]
         hell_cards = [c for c in cards[:card_pos] if c.value >= top2 and c.value != CardType.MOFETA.value]
@@ -489,7 +494,7 @@ class Game:
         self.hands = [d[:4] for d in self.decks]
         self.decks = [d[4:] for d in self.decks]
 
-        self.turn = 0
+        self.turn = randint(0, num_players - 1)
 
     def print(self):
         hand_rep = format_cards(self.hands[self.turn])
@@ -521,7 +526,9 @@ class Game:
         if self.game_mode == "full":
             for i, c in enumerate(self.table_cards):
                 if c and card != c and c.recursive:
-                    self.table_cards, self.hell, self.heaven = c.action()(i, self.table_cards, self.hell, self.heaven, [])
+                    self.table_cards, self.hell, self.heaven = c.action()(
+                        i, self.table_cards, self.hell, self.heaven, []
+                    )
 
         # open heaven and hell doors
         if all([c is not None for c in self.table_cards]):
