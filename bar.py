@@ -491,7 +491,7 @@ class Game:
         cardType_count = len(cardType_list)
         self.decks = [[Card(ct, Color(c)) for ct in sample(cardType_list, cardType_count)] for c in range(num_players)]
 
-        self.hands = [d[:4] for d in self.decks]
+        self.hands = [sorted(d[:4]) for d in self.decks]
         self.decks = [d[4:] for d in self.decks]
 
         self.turn = randint(0, num_players - 1)
@@ -546,6 +546,7 @@ class Game:
         # draw a card
         if self.decks[self.turn]:
             self.hands[self.turn].append(self.decks[self.turn].pop(0))
+            self.hands[self.turn].sort()
 
         # next turn
         self.turn = (self.turn + 1) % self.num_players
