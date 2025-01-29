@@ -8,12 +8,12 @@ from bar_gym import BarEnv
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
     model = DQN.load("models/dqn/dqn_final.zip")
-    env = BarEnv(game_mode="basic", render_mode="human", self_play=False)
+    env = BarEnv(game_mode="basic", render_mode="human")
     obs, _ = env.reset()
 
     while True:
-        if env.game.turn == 0:
-            action = model.predict(obs)[0]
+        if env.game.turn == env.agent_color.value:
+            action = model.predict(obs, deterministic=True)[0]
         else:
             pos = int(input("Select a card to play[0-3]: "))
             action = pos  # type: ignore[assignment]
@@ -25,7 +25,6 @@ if __name__ == "__main__":
                     msg := env.game.table_cards[actions[0]].action_msg()  # type: ignore[union-attr]
                 ):
                     actions.append(int(input(msg + ": ")))
-
 
         obs, _, terminated, truncated, _ = env.step(action)
 

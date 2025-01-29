@@ -1,4 +1,3 @@
-from sys import stderr
 from typing import Literal
 
 import gymnasium as gym
@@ -19,7 +18,7 @@ class BarEnv(gym.Env):
         opponent_model=None,
         num_players: Literal[2, 3, 4] = 2,
         game_mode: Literal["basic", "medium", "full"] = "full",
-        self_play: bool = True,
+        self_play: bool = False,
         render_mode=None,
     ):
         if game_mode != "basic":
@@ -28,7 +27,7 @@ class BarEnv(gym.Env):
         self.game = Game(num_players=num_players, game_mode=game_mode)
         self.game_mode = game_mode
         self.num_players = num_players
-        self.agent_color = Color(0)
+        self.agent_color = Color(np.random.randint(0, num_players))
         self.opponent_model = opponent_model
         self.self_play = self_play
 
@@ -44,7 +43,7 @@ class BarEnv(gym.Env):
         self.render_mode = render_mode
 
     def _get_obs(self):
-        cardt_count = len(CardType)
+        cardt_count = len(CardType.toList())
         cards_rep = np.zeros(self.observation_space.shape, dtype=np.int32)
         for c in self.game.heaven:
             cards_rep[c.color.value][c.value - 1] = self.HEAVEN
@@ -59,13 +58,27 @@ class BarEnv(gym.Env):
 
         return cards_rep
 
+    def _predict_opp(self):
+        hand_count = len(self.game.hands[self.game.turn])
+        if self.opponent_model:
+            act, _ = self.opponent_model.predict(self.obs)
+            if act > hand_count - 1:
+                act = np.random.randint(0, hand_count)
+            return act
+        else:
+            return np.random.randint(0, hand_count)
+
     def reset(self, seed: int | None = None, options: dict | None = None):
         super().reset(seed=seed, options=options)
 
-        del self.game
+        del self.game, self.agent_color
         self.game = Game(self.num_players, self.game_mode)
-        # del self.agent_color
-        # self.agent_color = Color(np.random.randint(0, self.num_players))
+        self.agent_color = Color(np.random.randint(0, self.num_players))
+
+        while self.self_play and self.game.turn != self.agent_color.value:
+            act = self._predict_opp()
+            self.game.play_card(act, [])
+            self.obs = self._get_obs()
 
         if self.render_mode == "human":
             self.game.print()
@@ -75,24 +88,23 @@ class BarEnv(gym.Env):
 
     def step(self, action):
         assert self.action_space.contains(action)
+        if self.self_play:
+            assert self.game.turn == self.agent_color.value
 
         hand_count = len(self.game.hands[self.game.turn])
-        if self.game.turn != self.agent_color.value and self.self_play:
-            if self.opponent_model:
-                action = self.opponent_model.predict(self.obs)[0]
-                if action > hand_count - 1:
-                    action = np.random.randint(0, hand_count)
-            else:
-                action = np.random.randint(0, hand_count)
-
         reward = 0
         if action > hand_count - 1:
-            reward = -0.25
+            reward = -0.1
             action = np.random.randint(0, hand_count)
 
         self.game.play_card(action, [])
 
-        if terminated := self.game.finished():
+        while self.self_play and self.game.turn != self.agent_color.value and not self.game.finished():
+            act = self._predict_opp()
+            self.game.play_card(act, [])
+            self.obs = self._get_obs()
+
+        if done := self.game.finished():
             winners = self.game.winners()
             if len(winners) == self.num_players:
                 reward = 0
@@ -106,4 +118,4 @@ class BarEnv(gym.Env):
         if self.render_mode == "human":
             self.game.print()
 
-        return self.obs, reward, terminated, False, {}
+        return self.obs, reward, done, False, {}
