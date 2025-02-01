@@ -9,9 +9,6 @@ from bar import Card, CardType, Color, Game
 
 class BarEnv(gym.Env):
     metadata = {"render_modes": ["human"], "render_fps": 4}
-    HEAVEN = 5
-    HELL = 6
-    HAND = 7
 
     def __init__(
         self,
@@ -27,14 +24,17 @@ class BarEnv(gym.Env):
         self.game = Game(num_players=num_players, game_mode=game_mode)
         self.game_mode = game_mode
         self.num_players = num_players
-        self.agent_color = Color(np.random.randint(0, num_players))
+        self.agent_color = Color(np.random.randint(0, self.num_players))
         self.opponent_model = opponent_model
         self.self_play = self_play
 
         self.observation_space = spaces.Box(
             low=0,
-            high=7,
-            shape=(num_players, len(CardType)),
+            high=1,
+            shape=(
+                num_players * 2 + num_players * 4 + 1 + 1,
+                len(CardType.toList()),
+            ),  # heaven + hell, board, hand, color
             dtype=np.int32,
         )
         self.action_space = spaces.Discrete(4)
@@ -45,16 +45,28 @@ class BarEnv(gym.Env):
     def _get_obs(self):
         cardt_count = len(CardType.toList())
         cards_rep = np.zeros(self.observation_space.shape, dtype=np.int32)
+
+        # num_players rows for heaven
         for c in self.game.heaven:
-            cards_rep[c.color.value][c.value - 1] = self.HEAVEN
+            cards_rep[c.color.value][c.value - 1] = 1
+
+        # num_players rows for hell
         for c in self.game.hell:
-            cards_rep[c.color.value][c.value - 1] = self.HELL
+            cards_rep[self.num_players + c.color.value][c.value - 1] = 1
+
+        # 4 * num_players rows for the board, there will never be 5 cards in the queue
         for i, c in enumerate(self.game.table_cards):
             if c is None:
                 break
-            cards_rep[c.color.value][c.value - 1] = i + 1
+            cards_rep[(2 + i) * self.num_players + c.color.value][c.value - 1] = 1
+
+        # hand row
         for c in self.game.hands[self.game.turn]:
-            cards_rep[c.color.value][c.value - 1] = self.HAND
+            cards_rep[-2][c.value - 1] = 1
+
+        # color row
+        for i in range(cardt_count):
+            cards_rep[-1][i] = self.game.turn
 
         return cards_rep
 
