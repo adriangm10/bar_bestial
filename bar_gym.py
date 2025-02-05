@@ -1,3 +1,4 @@
+import logging
 from typing import Literal
 
 import gymnasium as gym
@@ -5,6 +6,8 @@ import numpy as np
 from gymnasium import spaces
 
 from bar import Card, CardType, Color, Game
+
+logger = logging.getLogger(__name__)
 
 
 class BarEnv(gym.Env):
@@ -27,6 +30,7 @@ class BarEnv(gym.Env):
         self.agent_color = Color(0)
         self.opponent_model = opponent_model
         self.self_play = self_play
+        self.agent_heaven = 0
 
         self.observation_space = spaces.Box(
             low=0,
@@ -105,9 +109,11 @@ class BarEnv(gym.Env):
 
         hand_count = len(self.game.hands[self.game.turn])
         reward = 0
-        if action > hand_count - 1:
-            reward = -0.1
+        if action > hand_count - 1 and self.game.turn == self.agent_color.value:
+            # reward = -0.1
+            logger.info(f"the agent selected card {action + 1} but there are only {hand_count} cards, selecting a card randomly...")
             action = np.random.randint(0, hand_count)
+            # return self.obs, -1, True, True, {}
 
         self.game.play_card(action, [])
 
@@ -118,7 +124,7 @@ class BarEnv(gym.Env):
 
         if done := self.game.finished():
             winners = self.game.winners()
-            if len(winners) == self.num_players:
+            if len(winners) == self.num_players or not winners:
                 reward = 0
             elif self.agent_color in winners:
                 reward = 1
