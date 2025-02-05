@@ -76,7 +76,7 @@ class CardType(Enum):
             c: Card = cards[i]  # type: ignore[assignment]
             if c and c.card_type == CardType.MONO:
                 hell.append(c)
-                logger.info(f"the leon sends the monkey {c} to hell")
+                logger.info(f"the leon sends {c} to hell")
                 cards[i] = None
                 if i < 4 and cards[i + 1]:
                     cards[i] = cards[i + 1]
@@ -85,7 +85,7 @@ class CardType(Enum):
         for i in reversed(range(card_pos)):
             cards[i + 1] = cards[i]
         cards[0] = card
-        logger.info(f"the leon {card} puts itself at the first position")
+        logger.info(f"the {card} puts itself at the first position")
 
         return cards, hell, heaven
 
@@ -115,7 +115,7 @@ class CardType(Enum):
             cards[j + 1] = cards[j]
 
         cards[i] = card
-        logger.info(f"hipopotamo_action: the hipopotamo {card} tackles the animals and gets itself to the {i + 1} position")  # fmt: skip
+        logger.info(f"hipopotamo_action: the {card} tackles the animals and gets itself to the {i + 1} position")  # fmt: skip
         return cards, hell, heaven
 
     @classmethod
@@ -150,7 +150,7 @@ class CardType(Enum):
                 cards[j + dist] = None
 
         cards[i] = card
-        logger.info(f"cocodrilo_action: the cocodrilo sends all the animals in the way to hell and puts itself at the {i + 1} position")  # fmt: skip
+        logger.info(f"cocodrilo_action: the {card} sends all the animals in the way to hell and puts itself at the {i + 1} position")  # fmt: skip
         return cards, hell, heaven
 
     @classmethod
@@ -165,7 +165,7 @@ class CardType(Enum):
         if cards[card_pos] is None:
             logger.error("serpiente_action: the card in cards[card_pos] is none")
             raise ValueError("cards[card_pos] is None")
-        logger.info("serpiente_action: the serpiente orders the queue based on the force of each animal")
+        logger.info(f"serpiente_action: the {cards[card_pos]} orders the queue based on the force of each animal")
         return sorted(cards[: card_pos + 1], reverse=True) + [None] * (QUEUE_LEN - card_pos - 1), hell, heaven  # type: ignore[type-var]
 
     @classmethod
@@ -181,7 +181,7 @@ class CardType(Enum):
             logger.error("jirafa_action: the card in cards[card_pos] is none")
             raise ValueError("cards[card_pos] is None")
         if card_pos > 0 and cards[card_pos - 1] < cards[card_pos]:  # type: ignore[operator]
-            logger.info(f"jirafa_action: the jirafa {cards[card_pos]} passes above the {cards[card_pos - 1]}")
+            logger.info(f"jirafa_action: the {cards[card_pos]} passes above the {cards[card_pos - 1]}")
             cards[card_pos - 1], cards[card_pos] = cards[card_pos], cards[card_pos - 1]
 
         return cards, hell, heaven
@@ -505,7 +505,7 @@ class Game:
 
     def play_card(self, card_idx: int, actions: Actions):
         card = self.hands[self.turn].pop(card_idx)
-        logger.info(f"[GAME]: the player {self.turn} plays {card}")
+        logger.info(f"[GAME]: player {Color(self.turn).name} plays {card}")
 
         for i, c in enumerate(self.table_cards):
             if c is None:
@@ -556,9 +556,7 @@ class Game:
 
     def winners(self) -> list[Color]:
         players_heaven = [[c for c in self.heaven if c.color.value == col] for col in range(self.num_players)]
-
-        if all([len(cards) == 0 for cards in players_heaven]):
-            return []
+        players_heaven = [cs for cs in players_heaven if len(cs) > 0]
 
         max = 0
         winners_heaven = []
