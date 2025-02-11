@@ -66,7 +66,7 @@ class CardType(Enum):
         card: Card = cards[card_pos]  # type: ignore[assignment]
         cards[card_pos] = None
 
-        if any([c and c.card_type == cls.LEON for c in cards[:card_pos]]):
+        if any([c.card_type == cls.LEON for c in cards[:card_pos]]):
             hell.append(card)
             cards[card_pos] = None
             logger.info(f"{card} has gone directly to hell because there was another leon")
@@ -74,16 +74,15 @@ class CardType(Enum):
 
         for i in reversed(range(card_pos)):
             c: Card = cards[i]  # type: ignore[assignment]
-            if c and c.card_type == CardType.MONO:
+            if c.card_type == CardType.MONO:
                 hell.append(c)
                 logger.info(f"the leon sends {c} to hell")
-                cards[i] = None
-                if i < 4 and cards[i + 1]:
-                    cards[i] = cards[i + 1]
-                    cards[i + 1] = None
+                for j in range(i, card_pos):
+                    cards[j] = cards[j + 1]
 
         for i in reversed(range(card_pos)):
             cards[i + 1] = cards[i]
+
         cards[0] = card
         logger.info(f"the {card} puts itself at the first position")
 
@@ -275,12 +274,12 @@ class CardType(Enum):
             logger.error(f"canguro_action: the action {actions} is invalid")
             raise ValueError("Invalid action for canguro")
 
-        if card_pos - actions[0] >= 0:
-            card = cards[card_pos]
-            logger.info(f"canguro_action: the {card} jumps {actions[0]} positions")
-            for i in reversed(range(card_pos - actions[0], card_pos)):
-                cards[i + 1] = cards[i]
-            cards[card_pos - actions[0]] = card
+        new_pos = max(card_pos - actions[0], 0)
+        card = cards[card_pos]
+        logger.info(f"canguro_action: the {card} jumps {actions[0]} positions")
+        for i in reversed(range(card_pos - actions[0], card_pos)):
+            cards[i + 1] = cards[i]
+        cards[new_pos] = card
 
         return cards, hell, heaven
 
@@ -298,7 +297,7 @@ class CardType(Enum):
         if cards[card_pos] is None:
             logger.error("loro_action: the card in cards[card_pos] is none")
             raise ValueError("cards[card_pos] is None")
-        if not actions or cards[actions[0]] is None or actions[0] == card_pos:
+        if not actions or cards[actions[0]] is None:
             logger.error(f"loro_action: the action {actions} is invalid")
             raise ValueError("invalid action for a loro")
 
@@ -379,13 +378,20 @@ class CardType(Enum):
     def action_msg(self) -> str | None:
         match self:
             case CardType.CAMALEON:
-                return "Select a card to copy"
+                return "Select a card to copy[0-]"
             case CardType.CANGURO:
                 return "Select jump length[1|2]"
             case CardType.LORO:
-                return "Select a card to scare away"
+                return "Select a card to scare away[0-]"
             case _:
                 return None
+
+    def has_action(self) -> bool:
+        match self:
+            case CardType.CAMALEON | CardType.CANGURO | CardType.LORO:
+                return True
+            case _:
+                return False
 
     def __ge__(self, o) -> bool:
         if self.__class__ == o.__class__:
@@ -437,6 +443,9 @@ class Card:
 
     def action_msg(self) -> str | None:
         return self.card_type.action_msg()
+
+    def has_action(self) -> bool:
+        return self.card_type.has_action()
 
     def __eq__(self, o) -> bool:
         if self.__class__ == o.__class__:
@@ -496,6 +505,10 @@ class Game:
 
         self.turn = randint(0, num_players - 1)
 
+        self.chosen_card: Card | None = None
+        self.transformed_cardt: CardType | None = None
+        self.actions: list[int] = []
+
     def print(self):
         hand_rep = format_cards(self.hands[self.turn])
         table_rep = format_cards(self.table_cards)
@@ -503,29 +516,73 @@ class Game:
         print(f"{"\n".join(table_rep)}\n\n")
         print(f"{"\n".join(hand_rep)}\n\n")
 
-    def play_card(self, card_idx: int, actions: Actions):
-        card = self.hands[self.turn].pop(card_idx)
-        logger.info(f"[GAME]: player {Color(self.turn).name} plays {card}")
+    def possible_actions(self) -> list[int]:
+        if self.chosen_card:
+            cardt = self.transformed_cardt if self.transformed_cardt else self.chosen_card.card_type
+            match cardt:
+                case CardType.LORO:
+                    return [i for i, c in enumerate(self.table_cards) if c]
+                case CardType.CAMALEON:
+                    return [i for i, c in enumerate(self.table_cards) if c and c.card_type != CardType.CAMALEON]
+                case CardType.CANGURO:
+                    return [1, 2]
+                case _:
+                    return []
+        else:
+            return list(range(len(self.hands[self.turn])))
+
+    def action_msg(self) -> str | None:
+        if self.chosen_card:
+            return self.transformed_cardt.action_msg() if self.transformed_cardt else self.chosen_card.action_msg()
+        else:
+            return f"Select a card [0-{len(self.hands[self.turn]) - 1}]"
+
+    def play_card(self, action: int):
+        if self.chosen_card is None:
+            self.chosen_card = self.hands[self.turn].pop(action)
+            logger.info(f"[GAME]: {Color(self.turn).name} player plays {self.chosen_card}")
+
+            if self.chosen_card.has_action() and self.possible_actions() and self.table_cards[0] is not None:
+                logger.info(f"[GAME]: {Color(self.turn).name} player has to input card action")
+                return
+        else:
+            self.actions.append(action)
+            if (
+                self.chosen_card.card_type == CardType.CAMALEON
+                and not self.transformed_cardt
+                and self.table_cards[action].has_action()
+            ):
+                self.transformed_cardt = self.table_cards[action].card_type
+                logger.info(
+                    f"[GAME]: the {self.chosen_card} transforms to {self.transformed_cardt} and the player has to select its action"
+                )
+                return
 
         for i, c in enumerate(self.table_cards):
             if c is None:
-                self.table_cards[i] = card
+                self.table_cards[i] = self.chosen_card
                 card_pos = i
                 break
 
         # execute card
-        act = card.action()
+        act = self.chosen_card.action()
         try:
-            self.table_cards, self.hell, self.heaven = act(card_pos, self.table_cards, self.hell, self.heaven, actions)
+            self.table_cards, self.hell, self.heaven = act(
+                card_pos, self.table_cards, self.hell, self.heaven, self.actions
+            )
         except ValueError as e:
-            self.hands[self.turn].insert(card_idx, card)
+            self.hands[self.turn].append(self.chosen_card)
+            self.hands[self.turn].sort()
             self.table_cards[card_pos] = None
+            self.chosen_card = None
+            self.transformed_cardt = None
+            self.actions = []
             raise e
 
         # execute recurrent cards
         if self.game_mode == "full":
             for i, c in enumerate(self.table_cards):
-                if c and card != c and c.recursive:
+                if c and self.chosen_card != c and c.recursive:
                     self.table_cards, self.hell, self.heaven = c.action()(
                         i, self.table_cards, self.hell, self.heaven, []
                     )
@@ -550,6 +607,10 @@ class Game:
 
         # next turn
         self.turn = (self.turn + 1) % self.num_players
+
+        self.transformed_cardt = None
+        self.chosen_card = None
+        self.actions = []
 
     def finished(self) -> bool:
         return all([not d and not h for d, h in zip(self.decks, self.hands)])
@@ -594,7 +655,7 @@ class TestGame(unittest.TestCase):
         card = Card(CardType.MONO, Color(0))
         deck = self.game.decks[turn].copy()
         self.game.hands[turn][0] = card
-        self.game.play_card(0, [])
+        self.game.play_card(0)
 
         self.assertEqual(self.game.table_cards[0], card)
         self.assertEqual(len(self.game.hands[turn]), 4)
@@ -605,7 +666,7 @@ class TestGame(unittest.TestCase):
         card = Card(CardType.MONO, Color(0))
         self.game.hands[turn][0] = card
         self.game.decks[turn] = []
-        self.game.play_card(0, [])
+        self.game.play_card(0)
 
         self.assertEqual(self.game.table_cards[0], card)
         self.assertEqual(len(self.game.hands[turn]), 3)
@@ -620,7 +681,7 @@ class TestGame(unittest.TestCase):
         self.game.table_cards[:4] = table_cards
         hell_card = Card(CardType.MONO, Color.GREEN)
         self.game.hands[self.game.turn][0] = hell_card
-        self.game.play_card(0, [])
+        self.game.play_card(0)
 
         self.assertEqual(self.game.heaven, table_cards[:2])
         self.assertEqual(self.game.hell, [hell_card])
@@ -708,6 +769,26 @@ class TestCardActions(unittest.TestCase):
             None,
         ])  # leon hipopotamo cocodrilo
         self.assertEqual(hell, [table_cards[3], table_cards[1]])
+
+    def test_lion_action_monkeys2(self):
+        table_cards = [
+            Card(CardType.HIPOPOTAMO, Color.YELLOW),
+            Card(CardType.MONO, Color.GREEN),
+            Card(CardType.MONO, Color.YELLOW),
+            Card(CardType.COCODRILO, Color.YELLOW),
+            Card(CardType.LEON, Color.GREEN),
+        ]
+        cards, hell, heaven = CardType.leon_action(4, table_cards.copy(), self.hell, self.heaven, [])
+
+        # fmt: off
+        self.assertEqual(cards, [
+            table_cards[4],
+            table_cards[0],
+            table_cards[3],
+            None,
+            None,
+        ])  # leon hipopotamo cocodrilo
+        self.assertEqual(hell, [table_cards[2], table_cards[1]])
 
     def test_lion_action_other_lion(self):
         table_cards = [

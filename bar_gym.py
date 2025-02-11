@@ -24,9 +24,6 @@ class BarEnv(gym.Env):
         render_mode=None,
         t: int = 2,
     ):
-        if game_mode != "basic":
-            raise NotImplementedError
-
         self.game = Game(num_players=num_players, game_mode=game_mode)
         self.game_mode = game_mode
         self.num_players = num_players
@@ -36,7 +33,7 @@ class BarEnv(gym.Env):
         # self.agent_heaven = 0
         # self.opponent_heaven = 0
 
-        self.L = 1  # hand (1)
+        self.L = 1 if game_mode == "basic" else 2  # hand (1), chosen card (1)
         self.M = 6  # heaven (1), hell (1), and queue (4)
         self.MM = num_players * 6
         self.observation_space = spaces.Box(
@@ -64,6 +61,11 @@ class BarEnv(gym.Env):
         for c in self.game.hands[self.game.turn]:
             cards_rep[0][c.value - 1] = 1
 
+        # selected card
+        if self.game_mode != "basic" and self.game.chosen_card:
+            cardt = self.game.transformed_cardt if self.game.transformed_cardt else self.game.chosen_card.card_type
+            cards_rep[1][cardt.value - 1] = 1
+
         # color row
         # for i in range(cardt_count):
         #     cards_rep[1][i] = self.game.turn
@@ -85,19 +87,22 @@ class BarEnv(gym.Env):
         for i in range(1, min(self.t, len(self.history))):
             cards_rep[self.L + i * self.MM : self.L + (i + 1) * self.MM] = self.history[-i]
 
-        self.history.append(cards_rep[self.L : self.L + self.MM])
+        if self.game.chosen_card is None:
+            self.history.append(cards_rep[self.L : self.L + self.MM])
 
         return cards_rep
 
     def _predict_opp(self):
-        hand_count = len(self.game.hands[self.game.turn])
+        assert self.game.turn != self.agent_color.value
+
+        poss_actions = self.game.possible_actions()
         if self.opponent_model:
             act, _ = self.opponent_model.predict(self.obs)
-            if act > hand_count - 1:
-                act = np.random.randint(0, hand_count)
+            if act not in poss_actions:
+                act = np.random.choice(poss_actions)
             return act
         else:
-            return np.random.randint(0, hand_count)
+            return np.random.choice(poss_actions)
 
     def reset(self, seed: int | None = None, options: dict | None = None):
         super().reset(seed=seed, options=options)
@@ -110,7 +115,7 @@ class BarEnv(gym.Env):
 
         while self.self_play and self.game.turn != self.agent_color.value:
             act = self._predict_opp()
-            self.game.play_card(act, [])
+            self.game.play_card(act)
             self.obs = self._get_obs()
 
         if self.render_mode == "human":
@@ -124,18 +129,18 @@ class BarEnv(gym.Env):
         if self.self_play:
             assert self.game.turn == self.agent_color.value
 
-        hand_count = len(self.game.hands[self.game.turn])
+        poss_actions = self.game.possible_actions()
         reward = 0
-        if action > hand_count - 1 and self.game.turn == self.agent_color.value:
+        if action not in poss_actions and self.game.turn == self.agent_color.value:
             reward = -0.1
-            logger.debug(f"the agent selected card {action + 1} but there are only {hand_count} cards, selecting a card randomly...")
-            action = np.random.randint(0, hand_count)
+            logger.debug(f"the agent selected an invalid action: {action}")
+            action = np.random.choice(poss_actions)
 
-        self.game.play_card(action, [])
+        self.game.play_card(action)
 
         while self.self_play and self.game.turn != self.agent_color.value and not self.game.finished():
             act = self._predict_opp()
-            self.game.play_card(act, [])
+            self.game.play_card(act)
             self.obs = self._get_obs()
 
         # agent_heaven = len([c for c in self.game.heaven if c.color == self.agent_color])
