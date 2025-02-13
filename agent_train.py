@@ -8,8 +8,8 @@ from stable_baselines3.common.evaluation import evaluate_policy
 from bar_gym import BarEnv
 
 
-def model_v_random(model, num_games=100):
-    env = BarEnv(game_mode="basic", self_play=False)
+def model_v_random(model, num_games=100, game_mode="full"):
+    env = BarEnv(game_mode=game_mode, self_play=False)
     wins = 0
     losses = 0
     draws = 0
@@ -17,17 +17,19 @@ def model_v_random(model, num_games=100):
     for _ in range(num_games):
         obs, _ = env.reset()
         while True:
+            poss_actions = env.game.possible_actions()
             if env.game.turn == env.agent_color:
-                action = model.predict(obs)[0]
+                action = random.choice(poss_actions)
             else:
-                action = random.randint(0, len(env.game.hands[env.game.turn]) - 1)
+                action = random.choice(poss_actions)
 
             obs, r, terminated, truncated, _ = env.step(action)
             if terminated or truncated:
-                if r > 0:
-                    wins += 1
-                elif r == 0:
+                winners = env.game.winners()
+                if len(winners) == env.num_players or not winners:
                     draws += 1
+                elif env.agent_color in winners:
+                    wins += 1
                 else:
                     losses += 1
                 break
@@ -66,15 +68,28 @@ class SelfPlayCallback(BaseCallback):
 
 
 if __name__ == "__main__":
-    env = BarEnv(game_mode="basic", self_play=True)
+    def lr(a):
+        if a > 0.90:
+            return 0.1
+        elif a > 0.6:
+            return 0.01
+        elif a > 0.25:
+            return 0.001
+        else:
+            return 0.0001
+
+    env = BarEnv(game_mode="full", self_play=True, t=3, num_players=2)
     # eval_env = BarEnv(game_mode="basic")
-    model = DQN("MlpPolicy", env, verbose=0)
+    # model = DQN.load("./models/dqn/t1p2fdqn.zip")
+    # model.set_env(env)
+    # model = DQN("MlpPolicy", env, verbose=0)
+    model = PPO("MlpPolicy", env, verbose=0, learning_rate=lr)
     # eval_callback = EvalCallback(eval_env, best_model_save_path="models/dqn", eval_freq=5000, n_eval_episodes=1000)
-    selfplay_callback = SelfPlayCallback(env, update_after_n_episodes=2000, verbose=1)
-    model.learn(total_timesteps=9_000_000, callback=selfplay_callback)
+    selfplay_callback = SelfPlayCallback(env, update_after_n_episodes=1000, verbose=1)
+    model.learn(total_timesteps=15_000_000, callback=selfplay_callback)
 
-    model.save("models/dqn/dqn_final")
+    model.save("models/ppo/t3p2fppo")
 
-    # model = DQN.load("models/dqn/dqn_final")
+    # model = DQN.load("models/dqn/t3dqn")
     wins, losses, draws = model_v_random(model, num_games=1000)
     print(f"wins: {wins}, losses: {losses}, draws: {draws}")
