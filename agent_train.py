@@ -58,7 +58,7 @@ class SelfPlayCallback(BaseCallback):
 
             if self.episodes % self.update_after_n_episodes == 0:
                 self.model.save(self.temp_model_path)
-                self.env.opponent_model = self.model.__class__.load(self.temp_model_path)
+                self.env.set_opponent_model(self.model.__class__.load(self.temp_model_path))
                 if self.verbose > 0:
                     wins, losses, draws = model_v_random(self.model, num_games=50)
                     print(f"Updated opponent model at episode {self.episodes}")
@@ -78,17 +78,17 @@ if __name__ == "__main__":
         else:
             return 0.0001
 
-    env = BarEnv(game_mode="full", self_play=True, t=3, num_players=2)
+    env = BarEnv(game_mode="full", self_play=True, t=1, num_players=2)
     # eval_env = BarEnv(game_mode="basic")
     # model = DQN.load("./models/dqn/t1p2fdqn.zip")
     # model.set_env(env)
-    # model = DQN("MlpPolicy", env, verbose=0)
-    model = PPO("MlpPolicy", env, verbose=0, learning_rate=lr)
+    model = DQN("MlpPolicy", env, verbose=0, learning_rate=lr)
+    # model = PPO("MlpPolicy", env, verbose=0, learning_rate=lr)
     # eval_callback = EvalCallback(eval_env, best_model_save_path="models/dqn", eval_freq=5000, n_eval_episodes=1000)
     selfplay_callback = SelfPlayCallback(env, update_after_n_episodes=1000, verbose=1)
     model.learn(total_timesteps=15_000_000, callback=selfplay_callback)
 
-    model.save("models/ppo/t3p2fppo")
+    model.save("models/dqn/t1p2fcdqn")
 
     # model = DQN.load("models/dqn/t3dqn")
     wins, losses, draws = model_v_random(model, num_games=1000)

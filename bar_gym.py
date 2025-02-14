@@ -104,6 +104,9 @@ class BarEnv(gym.Env):
         else:
             return np.random.choice(poss_actions)
 
+    def set_opponent_model(self, model):
+        self.opponent_model = model
+
     def reset(self, seed: int | None = None, options: dict | None = None):
         super().reset(seed=seed, options=options)
 
@@ -111,7 +114,7 @@ class BarEnv(gym.Env):
         self.game = Game(self.num_players, self.game_mode)
         self.agent_color = Color(np.random.randint(0, self.num_players))
         self.history = []
-        # self.agent_heaven = 0
+        self.agent_heaven = 0
 
         while self.self_play and self.game.turn != self.agent_color.value:
             act = self._predict_opp()
