@@ -60,7 +60,13 @@ class SelfPlayCallback(BaseCallback):
                 self.model.save(self.temp_model_path)
                 self.env.set_opponent_model(self.model.__class__.load(self.temp_model_path))
                 if self.verbose > 0:
-                    wins, losses, draws = model_v_random(self.model, num_games=50)
+                    wins, losses, draws = model_v_random(
+                        self.model,
+                        num_games=100,
+                        game_mode=self.env.game_mode,
+                        num_players=self.env.num_players,
+                        t=self.env.t,
+                    )
                     print(f"Updated opponent model at episode {self.episodes}")
                     print(f"Stats against random actions: {{ wins: {wins}, losses: {losses}, draws: {draws} }}")
 
@@ -78,18 +84,18 @@ if __name__ == "__main__":
         else:
             return 0.0001
 
-    env = BarEnv(game_mode="full", self_play=True, t=3, num_players=2)
+    env = BarEnv(game_mode="full", self_play=True, t=1, num_players=2)
     # eval_env = BarEnv(game_mode="basic")
     # model = DQN.load("./models/dqn/t1p2fdqn.zip")
     # model.set_env(env)
     model = DQN("MlpPolicy", env, verbose=0)
-    # model = PPO("MlpPolicy", env, verbose=0, learning_rate=lr)
+    # model = PPO("MlpPolicy", env, verbose=0)
     # eval_callback = EvalCallback(eval_env, best_model_save_path="models/dqn", eval_freq=5000, n_eval_episodes=1000)
-    selfplay_callback = SelfPlayCallback(env, update_after_n_episodes=2500, verbose=1)
-    model.learn(total_timesteps=45_000_000, callback=selfplay_callback)
+    selfplay_callback = SelfPlayCallback(env, update_after_n_episodes=1000, verbose=1)
+    model.learn(total_timesteps=6_300_000, callback=selfplay_callback)
 
-    model.save("models/dqn/t3p2f2500actdqn")
+    model.save("models/dqn/t1p2finaldqn")
 
-    # model = DQN.load("models/dqn/t3p2fdqn.zip")
-    wins, losses, draws = model_v_random(model, num_games=1000, game_mode="full", t=3, num_players=2)
+    # model = DQN.load("models/dqn/t1p2basic")
+    wins, losses, draws = model_v_random(model, num_games=1000, game_mode="full", t=1, num_players=2)
     print(f"wins: {wins}, losses: {losses}, draws: {draws}")

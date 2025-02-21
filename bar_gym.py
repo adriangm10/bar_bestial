@@ -115,6 +115,7 @@ class BarEnv(gym.Env):
         self.agent_color = Color(np.random.randint(0, self.num_players))
         self.history = []
         self.agent_heaven = 0
+        self.opponent_heaven = 0
 
         while self.self_play and self.game.turn != self.agent_color.value:
             act = self._predict_opp()
@@ -134,7 +135,7 @@ class BarEnv(gym.Env):
 
         poss_actions = self.game.possible_actions()
         reward = 0
-        if action not in poss_actions and self.game.turn == self.agent_color.value:
+        if poss_actions and action not in poss_actions and self.game.turn == self.agent_color.value:
             reward = -0.1
             logger.debug(f"the agent selected an invalid action: {action}")
             action = np.random.choice(poss_actions)
@@ -147,9 +148,13 @@ class BarEnv(gym.Env):
             self.obs = self._get_obs()
 
         # agent_heaven = len([c for c in self.game.heaven if c.color == self.agent_color])
+        # opponent_heaven = len(self.game.heaven) - agent_heaven
         # if agent_heaven > self.agent_heaven:
         #     reward += agent_heaven - self.agent_heaven
         #     self.agent_heaven = agent_heaven
+        # if opponent_heaven > self.opponent_heaven:
+        #     reward -= opponent_heaven - self.opponent_heaven
+        #     self.opponent_heaven = opponent_heaven
 
         # done = self.game.finished()
         if done := self.game.finished():
