@@ -13,7 +13,11 @@ logger = logging.getLogger(__name__)
 class BarEnv(gym.Env):
     """ """
 
-    metadata = {"render_modes": ["human"], "render_fps": 4}
+    metadata = {
+        "render_modes": ["human"],
+        "game_modes": ["basic", "medium", "full"],
+        "num_players": [2, 3, 4],
+    }
 
     def __init__(
         self,
@@ -22,20 +26,38 @@ class BarEnv(gym.Env):
         game_mode: Literal["basic", "medium", "full"] = "full",
         self_play: bool = False,
         render_mode=None,
-        t: int = 2,
+        t: int = 1,
+        transfer_learning: tuple[str, int] | str | int | None = None,
     ):
+        assert num_players in self.metadata["num_players"]
+        assert game_mode in self.metadata["game_modes"]
+        assert render_mode is None or render_mode in self.metadata["render_modes"]
+
         self.game = Game(num_players=num_players, game_mode=game_mode)
         self.game_mode = game_mode
         self.num_players = num_players
         self.agent_color = Color(0)
         self.opponent_model = opponent_model
         self.self_play = self_play
-        # self.agent_heaven = 0
-        # self.opponent_heaven = 0
 
         self.L = 1 if game_mode == "basic" else 2  # hand (1), chosen card (1)
         self.M = 6  # heaven (1), hell (1), and queue (4)
-        self.MM = num_players * 6
+        self.MM = num_players * self.M
+
+        if transfer_learning:
+            assert isinstance(transfer_learning, (str, int, tuple))
+            if isinstance(transfer_learning, str):
+                assert transfer_learning in self.metadata["game_modes"]
+                self.L = 1 if transfer_learning == "basic" else 2
+            elif isinstance(transfer_learning, int):
+                assert transfer_learning in self.metadata["num_players"]
+                self.MM = transfer_learning * self.M  # type: ignore[assignment]
+            else:
+                assert transfer_learning[0] in self.metadata["game_modes"]  # type: ignore[index]
+                assert transfer_learning[1] in self.metadata["num_players"]  # type: ignore[index]
+                self.L = 2
+                self.MM = transfer_learning[1] * self.M  # type: ignore[index, assignment]
+
         self.observation_space = spaces.Box(
             low=0,
             high=1,
@@ -50,7 +72,6 @@ class BarEnv(gym.Env):
         self.t = t
         self.history: list[int] = []
 
-        assert render_mode is None or render_mode in self.metadata["render_modes"]
         self.render_mode = render_mode
 
     def _get_obs(self):
