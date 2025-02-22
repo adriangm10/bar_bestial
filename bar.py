@@ -489,6 +489,7 @@ class Game:
     ):
         if not 2 <= num_players <= 4:
             raise ValueError("There must be between 2 and 4 players")
+        assert game_mode in ["basic", "medium", "full"]
 
         self.num_players = num_players
         self.table_cards: TableCards = [None] * QUEUE_LEN
