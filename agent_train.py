@@ -56,6 +56,8 @@ class SelfPlayCallback(BaseCallback):
         stats_file: str | None = None,
         stats_file_mode: str = "w",
         transfer_learning=None,
+        checkpoints_dir: str | None = None,
+        save_checkpoint_after_n_episodes: int = 50_000,
     ):
         super().__init__(verbose)
         self.env = env
@@ -67,6 +69,8 @@ class SelfPlayCallback(BaseCallback):
         self.stats_file_name = stats_file
         self.stats_file_mode = stats_file_mode
         self.transfer_learning = transfer_learning
+        self.checkpoints_dir = checkpoints_dir
+        self.save_checkpoint_after_n_episodes = save_checkpoint_after_n_episodes
 
     def _on_training_start(self) -> None:
         if self.stats_file_name:
@@ -100,32 +104,24 @@ class SelfPlayCallback(BaseCallback):
                 if self.stats_file_name:
                     self.stats_file.write(f"{self.episodes},{wins},{losses},{draws}\n")
 
+            if self.checkpoints_dir and self.episodes % self.save_checkpoint_after_n_episodes == 0:
+                self.model.save(self.checkpoints_dir + f"/model_episode{self.episodes}")
+                if self.verbose > 0:
+                    print(f"New model checkpoint saved in {self.checkpoints_dir}/model_episode{self.episodes}")
+
         return True
 
     def _on_training_end(self) -> None:
-        if self.stats_file:
+        if self.stats_file_name:
             self.stats_file.close()
 
 
 if __name__ == "__main__":
-
-    def lr(a):
-        if a > 0.90:
-            return 0.1
-        elif a > 0.6:
-            return 0.01
-        elif a > 0.25:
-            return 0.001
-        else:
-            return 0.0001
-
     env = BarEnv(game_mode="full", self_play=True, t=1, num_players=2, transfer_learning=None)
-    # eval_env = BarEnv(game_mode="basic")
-    model = DQN.load("./models/dqn/t1p2full2Mdqn.zip")
-    model.set_env(env)
-    # model = DQN("MlpPolicy", env, verbose=0)
+    # model = DQN.load("./models/dqn/normal_reward_models/model_episode1000000.zip")
+    # model.set_env(env)
+    model = DQN("MlpPolicy", env, verbose=0)
     # model = PPO("MlpPolicy", env, verbose=0)
-    # eval_callback = EvalCallback(eval_env, best_model_save_path="models/dqn", eval_freq=5000, n_eval_episodes=1000)
     selfplay_callback = SelfPlayCallback(
         env,
         update_after_n_episodes=1000,
@@ -134,10 +130,11 @@ if __name__ == "__main__":
         stats_file=None,
         stats_file_mode="w",
         transfer_learning=None,
+        checkpoints_dir="models/dqn/normal_reward_models/",
     )
-    model.learn(total_timesteps=10_500_000, callback=selfplay_callback, reset_num_timesteps=False)
+    model.learn(total_timesteps=15_000_000, callback=selfplay_callback, reset_num_timesteps=False)
 
-    model.save("models/dqn/t1p2full2Mdqn")
+    model.save("models/dqn/normal_reward_models/final")
 
     # model = DQN.load("models/dqn/t1p2finaldqn")
     wins, losses, draws = model_v_random(model, num_games=1000, game_mode="full", t=1, num_players=2)
