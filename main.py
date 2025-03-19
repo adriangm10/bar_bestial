@@ -2,6 +2,7 @@ import argparse
 import logging
 from random import choice
 
+from sb3_contrib import QRDQN, TRPO
 from stable_baselines3 import DQN, PPO
 
 from bar_gym import BarEnv
@@ -13,6 +14,10 @@ def load_model(file: str, model_class: str):
             model = DQN.load(file)
         case "PPO":
             model = PPO.load(file)
+        case "QRDQN":
+            model = QRDQN.load(file)
+        case "TRPO":
+            model = TRPO.load(file)
         case _:
             raise ValueError(f"Not supported agent class: {args.agent1_class}")
     return model
@@ -59,16 +64,16 @@ if __name__ == "__main__":
     parser.add_argument(
         "--agent1-class",
         type=str,
-        choices=["DQN", "PPO"],
+        choices=["DQN", "PPO", "QRDQN", "TRPO"],
         default="DQN",
-        help='First agent\'s class "DQN" or "PPO", this argument is ignored if --agent argument is not defined',
+        help='First agent\'s class ["DQN", "PPO", "QRDQN", "TRPO"], this argument is ignored if --agent argument is not defined',
     )
     parser.add_argument(
         "--agent2-class",
         type=str,
-        choices=["DQN", "PPO"],
+        choices=["DQN", "PPO", "QRDQN", "TRPO"],
         default="DQN",
-        help='Second agent\'s class "DQN" or "PPO", this argument is ignored if --agent-v-agent is not defined',
+        help='Second agent\'s class ["DQN", "PPO", "QRDQN", "TRPO"], this argument is ignored if --agent-v-agent is not defined',
     )
     parser.add_argument(
         "--agent-v-agent",
