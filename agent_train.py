@@ -1,6 +1,8 @@
+import argparse
 import random
 from typing import Literal
 
+from sb3_contrib import QRDQN, TRPO
 from stable_baselines3 import DQN, PPO
 from stable_baselines3.common.callbacks import BaseCallback
 
@@ -91,7 +93,7 @@ class SelfPlayCallback(BaseCallback):
             if self.episodes % self.evaluate_after_n_episodes == 0:
                 wins, losses, draws = model_v_random(
                     self.model,
-                    num_games=100,
+                    num_games=1000,
                     game_mode=self.env.game_mode,
                     num_players=self.env.num_players,
                     t=self.env.t,
@@ -117,24 +119,88 @@ class SelfPlayCallback(BaseCallback):
 
 
 if __name__ == "__main__":
-    env = BarEnv(game_mode="full", self_play=True, t=1, num_players=2, transfer_learning=None)
-    # model = DQN.load("./models/dqn/normal_reward_models/model_episode1000000.zip")
-    # model.set_env(env)
-    model = DQN("MlpPolicy", env, verbose=0)
-    # model = PPO("MlpPolicy", env, verbose=0)
+    parser = argparse.ArgumentParser(prog="train agent")
+    algorithms = {
+        "PPO": PPO,
+        "DQN": DQN,
+        "QRDQN": QRDQN,
+        "TRPO": TRPO,
+    }
+
+    parser.add_argument(
+        "--alg", type=str, choices=["DQN", "PPO", "QRDQN", "TRPO"], default="DQN", help="RL algorithm to use"
+    )
+    parser.add_argument(
+        "--num-players",
+        type=int,
+        choices=[2, 3, 4],
+        default=2,
+        help="Number of players in game, possible numbers: 2, 3, 4. Default is set to 2",
+    )
+    parser.add_argument(
+        "--game-mode",
+        type=str,
+        default="full",
+        choices=["full", "medium", "basic"],
+        help='Game mode option to play, possible options: "basic", "medium", "full". Default is set to full.',
+    )
+    parser.add_argument(
+        "--num-timesteps",
+        type=int,
+        default=15_000_000,
+        help="Number of timesteps to train for, each games is approximately 15 timesteps in 'medium' and 'full' gamemodes and 9 in 'basic'. Default is set to 15_000_000 (1M games)",
+    )
+    parser.add_argument(
+        "--continue-training",
+        type=str,
+        default=None,
+        metavar="FILE_NAME",
+        help="If a file is given the script will continue training the model in that file",
+    )
+    parser.add_argument(
+        "--stats-file",
+        type=str,
+        default=None,
+        metavar="FILE_NAME",
+        help="A file to save the evaluations against random actions during the training.",
+    )
+    parser.add_argument(
+        "--checkpoints-dir",
+        type=str,
+        default=None,
+        metavar="FILE_NAME",
+        help="A file to save model checkpoints during the training.",
+    )
+    parser.add_argument(
+        "--save-model-file",
+        type=str,
+        required=True,
+        metavar="FILE_NAME",
+        help="File to save the trained model",
+    )
+
+    args = parser.parse_args()
+    env = BarEnv(game_mode=args.game_mode, self_play=True, t=1, num_players=args.num_players, transfer_learning=None)
+
+    model = (
+        algorithms[args.alg].load(args.continue_training)
+        if args.continue_training
+        else algorithms[args.alg]("MlpPolicy", env, verbose=0)
+    )
+
     selfplay_callback = SelfPlayCallback(
         env,
         update_after_n_episodes=1000,
         verbose=1,
-        evaluate_after_n_episodes=2500,
-        stats_file=None,
-        stats_file_mode="w",
+        evaluate_after_n_episodes=25_000,
+        stats_file=args.stats_file,
+        stats_file_mode="w" if args.continue_training is None else "a",
         transfer_learning=None,
-        checkpoints_dir="models/dqn/normal_reward_models/",
+        checkpoints_dir=args.checkpoints_dir,
     )
-    model.learn(total_timesteps=15_000_000, callback=selfplay_callback, reset_num_timesteps=False)
+    model.learn(total_timesteps=args.num_timesteps, callback=selfplay_callback, reset_num_timesteps=False)
 
-    model.save("models/dqn/normal_reward_models/final")
+    model.save(args.save_model_file)
 
     # model = DQN.load("models/dqn/t1p2finaldqn")
     wins, losses, draws = model_v_random(model, num_games=1000, game_mode="full", t=1, num_players=2)
