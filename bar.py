@@ -1,24 +1,23 @@
 # mypy: disable-error-code="empty-body,union-attr"
 import logging
 import unittest
-from collections.abc import Callable, Sequence
+from collections.abc import Callable
 from enum import Enum
 from functools import reduce
 from random import randint, sample
-from typing import Annotated, Literal, Self
+from typing import Annotated, Literal
 
 from termcolor import colored
+
+CARD_WIDTH = 15
+QUEUE_LEN = 5
+logger = logging.getLogger(__name__)
 
 type TableCards = Annotated[list[Card | None], QUEUE_LEN]
 type Actions = list[int]
 type Hell = list[Card]
 type Heaven = list[Card]
 type CardFunction = Callable[[int, TableCards, Hell, Heaven, Actions], tuple[TableCards, Hell, Heaven]]
-
-
-CARD_WIDTH = 15
-QUEUE_LEN = 5
-logger = logging.getLogger(__name__)
 
 
 class Color(Enum):
@@ -413,7 +412,7 @@ class Card:
         self.color = color
 
     def format(self) -> list[str]:
-        recursive_symbol = ""
+        recursive_symbol = "↻"
         top_border = "╔{}╗".format("═" * (CARD_WIDTH - 2))
         bot_border = "╚{}╝".format("═" * (CARD_WIDTH - 2))
         header = "║{:02}{}{:02}║".format(
