@@ -6,7 +6,7 @@ from sb3_contrib import QRDQN, TRPO
 from stable_baselines3 import DQN, PPO
 from stable_baselines3.common.callbacks import BaseCallback
 
-from bar_gym import BarEnv
+from game.bar_gym import BarEnv
 
 
 def model_v_random(

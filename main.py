@@ -5,7 +5,7 @@ from random import choice
 from sb3_contrib import QRDQN, TRPO
 from stable_baselines3 import DQN, PPO
 
-from bar_gym import BarEnv
+from game.bar_gym import BarEnv
 
 
 def load_model(file: str, model_class: str):

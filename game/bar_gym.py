@@ -5,7 +5,7 @@ import gymnasium as gym
 import numpy as np
 from gymnasium import spaces
 
-from bar import Card, CardType, Color, Game
+from game.bar import CardType, Color, Game
 
 logger = logging.getLogger(__name__)
 
@@ -75,7 +75,6 @@ class BarEnv(gym.Env):
         self.render_mode = render_mode
 
     def _get_obs(self):
-        cardt_count = len(CardType.toList())
         cards_rep = np.zeros(self.observation_space.shape, dtype=np.int32)
 
         # hand row
