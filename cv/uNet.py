@@ -1,4 +1,4 @@
-import sys
+import argparse
 
 import matplotlib.pyplot as plt
 import torch
@@ -44,11 +44,13 @@ class UpSample(nn.Module):
         self.upConv = nn.ConvTranspose2d(in_channels, in_channels // 2, 2, stride=2)
         self.conv = DoubleConv(in_channels, out_channels)
 
-    def forward(self, x1, x2):
+    def forward(self, x1, x2: torch.Tensor):
         # x1.size = [batch_size, channels, H, W]
         # x2.size = [batch_size, channels // 2, H, W]
 
         x1 = self.upConv(x1)
+        if x1.shape[2:] != x2.shape[2:]:
+            x1 = nn.functional.interpolate(x1, size=x2.shape[2:], mode="bilinear")
         x = torch.cat((x1, x2), 1)
         return self.conv(x)
 
@@ -76,6 +78,7 @@ class UNet(nn.Module):
         self.outl = nn.Conv2d(channels, num_classes, 1)
 
     def forward(self, x):
+        x = v2.functional.normalize_image(x, [0], [1])
         fm, y = self.down[0](x)
         fms = [fm]
         for d in self.down[1:]:
@@ -96,7 +99,7 @@ def dice_coefficient(pred, target, epsilon=1e-6):
     # target.size = [batch_size, 1, H, W]
 
     dice = 0
-    pred = torch.argmax(torch.softmax(pred, dim=1), dim=1)
+    pred = torch.argmax(pred, dim=1)
     num_labels = pred.max() + 1
 
     for i in range(num_labels):
@@ -157,37 +160,55 @@ if __name__ == "__main__":
     device = "cuda" if torch.cuda.is_available() else "cpu"
     print(f"Running on the {device} device")
 
-    save_file_name = sys.argv[2] if len(sys.argv) > 2 else "unet"
+    parser = argparse.ArgumentParser(prog="uNet")
+    parser.add_argument("--load", type=str, default=None, help="File to load the model from")
+    parser.add_argument(
+        "--save-file", type=str, default="unet", help="File to save the trained model without extension"
+    )
+    parser.add_argument(
+        "--combine-qs-hs", action="store_true", help="whether to combine the hand cards in one mask and the queue cards in other mask"
+    )
+    args = parser.parse_args()
+    save_file_name = args.save_file
 
-    num_labels = 12
-    label_map = {
-        0: "_background_",
-        1: "q1",
-        2: "q2",
-        3: "q3",
-        4: "q4",
-        5: "q5",
-        6: "h1",
-        7: "h2",
-        8: "h3",
-        9: "h4",
-        10: "hell",
-        11: "heaven",
-    }
+    if args.combine_qs_hs:
+        num_labels = 5
+        label_map = {
+            0: "_background_",
+            1: "q1",
+            2: "h1",
+            3: "hell",
+            4: "heaven",
+        }
+    else:
+        num_labels = 12
+        label_map = {
+            0: "_background_",
+            1: "q1",
+            2: "q2",
+            3: "q3",
+            4: "q4",
+            5: "q5",
+            6: "h1",
+            7: "h2",
+            8: "h3",
+            9: "h4",
+            10: "hell",
+            11: "heaven",
+        }
 
-    dataset = BarDataset("./cv/game_images_voc/")
+    dataset = BarDataset("./cv/game_images_voc/", combine_qs_and_hs=args.combine_qs_hs)
     train_dataset, test_dataset = random_split(dataset, [0.8, 0.2])
 
     train_dataset.dataset.transform = v2.Compose(
         [
-            v2.RandomHorizontalFlip(p=0.5),
             v2.ColorJitter(),
             v2.RandomRotation((-7, 7)),
-            v2.RandomGrayscale(),
+            v2.Grayscale(),
         ]
     )
 
-    batch_size = 4
+    batch_size = 8
     lr = 1e-4
     epochs = 200
     t = 0
@@ -195,14 +216,15 @@ if __name__ == "__main__":
     train_dataloader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
     test_dataloader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
 
-    model = UNet(3, num_labels).to(device)
-    optimizer = torch.optim.Adam(model.parameters(), lr=1e-4)
+    model = UNet(1, num_labels, encoder_depth=3, firstl_channels=32).to(device)
+    print("Number of parameters of the model:", sum(p.numel() for p in model.parameters() if p.requires_grad))
+    optimizer = torch.optim.Adam(model.parameters(), lr=lr)
     loss_fn = nn.CrossEntropyLoss(ignore_index=255)
 
     train_losses, train_dices, test_losses, test_dices = [], [], [], []
 
-    if len(sys.argv) > 1:
-        checkpoint = torch.load(sys.argv[1])
+    if args.load:
+        checkpoint = torch.load(args.load)
         model.load_state_dict(checkpoint["model_state_dict"])
         optimizer.load_state_dict(checkpoint["optim_state_dict"])
         train_losses = checkpoint["train_loss"]
@@ -224,8 +246,8 @@ if __name__ == "__main__":
         print(f"test_loss: {test_loss}, test DICE: {test_dice}")
 
     model.eval()
-    example_inputs = torch.randn(1, 3, 640, 480)
-    torch.onnx.export(model, example_inputs, save_file_name + ".onnx", verbose=True, dynamo=True, optimize=True)
+    # example_inputs = torch.randn(1, 3, 640, 480)
+    # torch.onnx.export(model, example_inputs, save_file_name + ".onnx", verbose=True, dynamo=True, optimize=True)
     torch.save(
         {
             "model_state_dict": model.state_dict(),

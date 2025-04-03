@@ -1,4 +1,5 @@
 import os
+import time
 
 import matplotlib.pyplot as plt
 import torch
@@ -9,9 +10,10 @@ from torchvision.transforms import v2
 
 
 class BarDataset(Dataset):
-    def __init__(self, root_dir: str, transform: v2.Transform | None = None) -> None:
+    def __init__(self, root_dir: str, transform: v2.Transform | None = None, combine_qs_and_hs: bool = False) -> None:
         self.root_dir = root_dir
         self.transform = transform
+        self.combine_qs_and_hs = combine_qs_and_hs
         self.images_dir = os.path.join(root_dir, "JPEGImages")
         self.masks_dir = os.path.join(root_dir, "SegmentationClass")
 
@@ -32,12 +34,19 @@ class BarDataset(Dataset):
 
         if self.transform:
             # image, mask = self.transform(image, mask)
-            seed = torch.randint(0, 10000, (1,)).item()
+            seed = time.time_ns()
             torch.manual_seed(seed)
             image = self.transform(image)
 
             torch.manual_seed(seed)
             mask = self.transform(mask)
+
+        if self.combine_qs_and_hs:
+            mask[(1 <= mask) & (mask <= 5)] = 1
+            mask[(6 <= mask) & (mask <= 9)] = 2
+            mask[10 == mask] = 3
+            mask[11 == mask] = 4
+
         return image, mask
 
 
@@ -50,30 +59,41 @@ if __name__ == "__main__":
             v2.RandomGrayscale(),
         ]
     )
-    dataset = BarDataset("./cv/game_images_voc/", transform=transforms)
+    combine_qs_and_hs = True
+    dataset = BarDataset("./cv/game_images_voc/", transform=transforms, combine_qs_and_hs=combine_qs_and_hs)
     print(dataset[0][1].size())
 
-    label_map = {
-        0: "_background_",
-        1: "q1",
-        2: "q2",
-        3: "q3",
-        4: "q4",
-        5: "q5",
-        6: "h1",
-        7: "h2",
-        8: "h3",
-        9: "h4",
-        10: "hell",
-        11: "heaven",
-    }
+    if combine_qs_and_hs:
+        label_map = {
+            0: "_background_",
+            1: "q",
+            2: "h",
+            3: "hell",
+            4: "heaven",
+        }
+    else:
+        label_map = {
+            0: "_background_",
+            1: "q1",
+            2: "q2",
+            3: "q3",
+            4: "q4",
+            5: "q5",
+            6: "h1",
+            7: "h2",
+            8: "h3",
+            9: "h4",
+            10: "hell",
+            11: "heaven",
+        }
 
     img, mask = dataset[0]
+    args = (2, 3) if combine_qs_and_hs else (4, 3)
     figure = plt.figure()
-    figure.add_subplot(3, 4, 1)
+    figure.add_subplot(*args, 1)
     plt.imshow(img.byte().permute((1, 2, 0)))
-    for i in range(1, 12):
-        figure.add_subplot(3, 4, i + 1)
+    for i in range(1, len(label_map)):
+        figure.add_subplot(*args, i + 1)
         plt.imshow((mask == i).permute((1, 2, 0)))
         plt.title(label_map[i])
 
