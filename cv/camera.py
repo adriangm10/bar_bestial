@@ -45,7 +45,7 @@ if __name__ == "__main__":
 
         if rval:
             if model:
-                blob = blobFromImage(cv2.cvtColor(frame, cv2.COLOR_RGB2GRAY))
+                blob = blobFromImage(cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY))
                 img = torch.Tensor(blob).to(device)
 
                 with torch.no_grad():

@@ -78,7 +78,6 @@ class UNet(nn.Module):
         self.outl = nn.Conv2d(channels, num_classes, 1)
 
     def forward(self, x):
-        x = v2.functional.normalize_image(x, [0], [1])
         fm, y = self.down[0](x)
         fms = [fm]
         for d in self.down[1:]:

@@ -10,7 +10,7 @@ MAX_CARD_AREA = int(2.5 * MIN_CARD_AREA)
 
 
 def binarize_image(img: MatLike) -> MatLike:
-    gray = cv2.cvtColor(img, cv2.COLOR_RGB2GRAY)
+    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
     blurred = cv2.GaussianBlur(gray, (5, 5), 0)
     h, w = gray.shape[:2]
     boty, topy, botx, topx = h // 100, h - h // 100, w // 100, w - w // 100
@@ -39,7 +39,7 @@ def separate_cards(img: MatLike, contours: Sequence[MatLike]):
         cv2.drawContours(mask, [cnt], 0, (255, 255, 255), cv2.FILLED)
         cards = cv2.bitwise_and(img, img, mask=mask)
 
-        gray_cards = cv2.cvtColor(cards, cv2.COLOR_RGB2GRAY)
+        gray_cards = cv2.cvtColor(cards, cv2.COLOR_BGR2GRAY)
         thresh = gray_cards.max() - 50
         _, th = cv2.threshold(gray_cards, thresh, 255, cv2.THRESH_BINARY_INV)
         cnts, hier = cv2.findContours(th, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
@@ -80,7 +80,6 @@ def card_positions(
     top_group.sort(key=lambda cnt: cv2.boundingRect(cnt)[0])
     hand_group.sort(key=lambda cnt: cv2.boundingRect(cnt)[0])
     if len(top_group) < 2:
-        print("ERROR: heaven and hell not detected")
         return None, [], None, hand_group
     return top_group[0], top_group[1:-1], top_group[-1], hand_group
 
