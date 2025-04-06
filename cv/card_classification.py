@@ -25,6 +25,52 @@ def card_color(img: MatLike) -> int:
     return np.argmax([cv2.inRange(img_hsv, lowb, highb).sum() for lowb, highb in boundaries])  # type: ignore
 
 
+class CNN(nn.Module):
+    def __init__(self, input_channels: int, num_classes: int) -> None:
+        super().__init__()
+        self.relu = nn.ReLU(inplace=True)
+        self.maxpool = nn.MaxPool2d(2)
+        self.conv1 = nn.Conv2d(input_channels, 16, kernel_size=3)
+        self.conv2 = nn.Conv2d(16, 16, kernel_size=3)
+        self.bn1 = nn.BatchNorm2d(16)
+        self.conv3 = nn.Conv2d(16, 32, kernel_size=3)
+        self.conv4 = nn.Conv2d(32, 32, kernel_size=3)
+        self.bn2 = nn.BatchNorm2d(32)
+        self.conv5 = nn.Conv2d(32, 64, kernel_size=3)
+        self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
+        self.fc = nn.Linear(64, num_classes)
+
+        for m in self.modules():
+            if isinstance(m, nn.Conv2d):
+                nn.init.kaiming_normal_(m.weight, mode="fan_out", nonlinearity="relu")
+            elif isinstance(m, (nn.BatchNorm2d, nn.GroupNorm)):
+                nn.init.constant_(m.weight, 1)
+                nn.init.constant_(m.bias, 0)
+
+    def forward(self, x):
+        x = self.conv1(x)
+        x = self.relu(x)
+        x = self.conv2(x)
+        x = self.bn1(x)
+        x = self.relu(x)
+        x = self.maxpool(x)
+
+        x = self.conv3(x)
+        x = self.relu(x)
+        x = self.conv4(x)
+        x = self.bn2(x)
+        x = self.maxpool(x)
+
+        x = self.conv5(x)
+        x = self.relu(x)
+
+        x = self.avgpool(x)
+        x = torch.flatten(x, 1)
+        x = self.fc(x)
+
+        return x
+
+
 def train_loop(dataloader, model, loss_fn, optimizer, device) -> tuple[float, float]:
     model.train()
 
@@ -46,9 +92,9 @@ def train_loop(dataloader, model, loss_fn, optimizer, device) -> tuple[float, fl
         train_loss += loss.item()
         train_acc += (pred.argmax(1) == force).float().sum().item()
 
-        # if batch % 2 == 0:
-        #     loss, current = loss.item(), batch * len(imgs)
-        #     print(f"loss: {loss:>7f}  [{current:>5d}/{size:>5d}]")
+        if batch % 5 == 0:
+            loss, current = loss.item(), batch * len(imgs)
+            print(f"loss: {loss:>7f}  [{current:>5d}/{size:>5d}]")
 
     return train_loss / len(dataloader), train_acc / len(dataloader.dataset)
 
@@ -77,21 +123,36 @@ if __name__ == "__main__":
     parser.add_argument(
         "--train", type=str, default=None, help="File to save the trained model (without file extension)"
     )
+    parser.add_argument("--resnet", action="store_true", help="wether to use a resnet o the custom created")
     args = parser.parse_args()
 
     if args.train:
         dataset = CardDataset("./cv/card_images/")
         train_dataset, test_dataset = random_split(dataset, [0.8, 0.2])
 
-        train_dataset.dataset.transform = v2.Compose(
-            [
-                v2.ColorJitter(brightness=0.3, contrast=0.5, saturation=0.1, hue=0),
-                v2.RandomVerticalFlip(),
-                v2.RandomRotation((-10, 10), interpolation=InterpolationMode.BILINEAR, expand=True),
-                v2.RandomCrop((70, 50)),
-                v2.ToDtype(torch.float32, scale=True),
-            ]
-        )
+        if args.resnet:
+            trfm = v2.Compose(
+                [
+                    v2.ColorJitter(brightness=0.3, contrast=0.5, saturation=0.1, hue=0),
+                    v2.RandomVerticalFlip(),
+                    v2.RandomRotation((-10, 10), interpolation=InterpolationMode.BILINEAR, expand=True),
+                    v2.RandomCrop((70, 50)),
+                    v2.ToDtype(torch.float32, scale=True),
+                ]
+            )
+        else:
+            trfm = v2.Compose(
+                [
+                    v2.ColorJitter(brightness=0.3, contrast=0.5, saturation=0.1, hue=0),
+                    v2.RandomVerticalFlip(),
+                    v2.RandomRotation((-10, 10), interpolation=InterpolationMode.BILINEAR, expand=True),
+                    v2.RandomCrop((70, 50)),
+                    v2.Grayscale(),
+                    v2.ToDtype(torch.float32, scale=True),
+                ]
+            )
+
+        train_dataset.dataset.transform = trfm
 
         batch_size = 20
         lr = 1e-4
@@ -101,9 +162,13 @@ if __name__ == "__main__":
         train_dataloader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
         test_dataloader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
 
-        model = models.resnet18()
-        model.fc = nn.Linear(model.fc.in_features, 12)
-        model = model.to(device)
+        if args.resnet:
+            model = models.resnet18()
+            model.fc = nn.Linear(model.fc.in_features, 12)
+            model = model.to(device)
+        else:
+            model = CNN(1, 12).to(device)
+
         print("Number of parameters of the model:", sum(p.numel() for p in model.parameters() if p.requires_grad))
         optimizer = torch.optim.Adam(model.parameters(), lr=lr)
         loss_fn = nn.CrossEntropyLoss()
@@ -119,7 +184,7 @@ if __name__ == "__main__":
             test_losses = checkpoint["test_loss"]
             test_accs = checkpoint["test_accs"]
             t = len(train_losses)
-            epochs = t + 50
+            epochs = t + 100
 
         for t in range(t, epochs):
             print(f"Epoch {t + 1}\n----------------------------")
@@ -130,7 +195,7 @@ if __name__ == "__main__":
             test_loss, test_dice = test_loop(test_dataloader, model, loss_fn, device)
             test_losses.append(test_loss)
             test_accs.append(test_dice)
-            print(f"test_loss: {test_loss}, test acc: {test_dice}")
+            print(f"test_loss: {test_loss}, test acc: {test_dice}\n")
 
         model.eval()
         # example_inputs = torch.randn(1, 3, 640, 480)
@@ -153,17 +218,18 @@ if __name__ == "__main__":
         cv2.namedWindow("preview", cv2.WINDOW_NORMAL)
         img_dir = "./cv/card_images/"
         imgs = sorted(os.listdir(img_dir))
-        model = models.resnet18()
-        model.fc = nn.Linear(model.fc.in_features, 12)
+
+        if args.resnet:
+            model = models.resnet18()
+            model.fc = nn.Linear(model.fc.in_features, 12)
+            trfm = v2.Compose([v2.ToImage(), v2.ToDtype(torch.float32, scale=True)])
+        else:
+            model = CNN(1, 12)
+            trfm = v2.Compose([v2.ToImage(), v2.Grayscale(), v2.ToDtype(torch.float32, scale=True)])
 
         checkpoint = torch.load(args.load)
         model.load_state_dict(checkpoint["model_state_dict"])
         model = model.eval().to(device)
-        train_losses = checkpoint["train_loss"]
-        train_accs = checkpoint["train_accs"]
-        test_losses = checkpoint["test_loss"]
-        test_accs = checkpoint["test_accs"]
-        t = len(train_losses)
 
         color_map = {
             0: "yellow",
@@ -178,12 +244,6 @@ if __name__ == "__main__":
                 img = cv2.flip(img, 0)
             color = card_color(img)
 
-            trfm = v2.Compose(
-                [
-                    v2.ToImage(),
-                    v2.ToDtype(torch.float32, scale=True),
-                ]
-            )
             blob = trfm(img).unsqueeze(0).to(device)
             with torch.no_grad():
                 pred = model(blob)

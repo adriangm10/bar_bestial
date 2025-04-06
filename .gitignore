@@ -2,3 +2,4 @@ __pycache__/
 .mypy_cache/
 cv/game_images_voc/
 opencv_images/
+training_models/
