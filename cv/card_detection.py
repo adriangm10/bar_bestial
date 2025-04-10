@@ -14,7 +14,7 @@ def binarize_image(img: MatLike) -> MatLike:
     blurred = cv2.GaussianBlur(gray, (5, 5), 0)
     h, w = gray.shape[:2]
     boty, topy, botx, topx = h // 100, h - h // 100, w // 100, w - w // 100
-    thresh = max(gray[boty][w // 2], gray[topy][w // 2], gray[boty][botx], gray[topy][botx], gray[boty][topx], gray[topy][topx]) + 10  # type: ignore
+    thresh = np.clip(max(gray[boty][w // 2], gray[topy][w // 2], gray[boty][botx], gray[topy][botx], gray[boty][topx], gray[topy][topx]) + 10, 0, 255)  # type: ignore
     _, th = cv2.threshold(blurred, thresh, 255, cv2.THRESH_BINARY)
     return th
 
@@ -40,7 +40,7 @@ def separate_cards(img: MatLike, contours: Sequence[MatLike]):
         cards = cv2.bitwise_and(img, img, mask=mask)
 
         gray_cards = cv2.cvtColor(cards, cv2.COLOR_BGR2GRAY)
-        thresh = gray_cards.max() - 50
+        thresh = np.clip(gray_cards.max() - 50, 0, 255)
         _, th = cv2.threshold(gray_cards, thresh, 255, cv2.THRESH_BINARY_INV)
         cnts, hier = cv2.findContours(th, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
 

@@ -5,7 +5,7 @@ from typing import Sequence
 import cv2
 import numpy as np
 import torch
-from card_classification import card_color, CNN
+from card_classification import card_color
 from card_detection import (binarize_image, card_contours, card_positions,
                             separate_cards)
 from cv2.dnn import blobFromImage
@@ -24,14 +24,15 @@ def camera_idxs():
             cap.release()
     return arr
 
-def put_labels(frame: MatLike, cnts: Sequence[MatLike], pos_name: str, model, dest: MatLike, device: str) -> MatLike:
-    trfm = v2.Compose(
-        [
-            v2.ToImage(),
-            # v2.Grayscale(),
-            v2.ToDtype(torch.float32, scale=True),
-        ]
-    )
+
+def is_horizontal_rect(rect: tuple[float, float, float, float], aspect_ratio_thresh: float = 1.5):
+    _, _, w, h = rect
+    aspect_ratio = w / h if h != 0 else 0
+    return aspect_ratio > aspect_ratio_thresh
+
+
+def put_labels(img: MatLike, cnts: Sequence[MatLike], pos_name: str, model, dest: MatLike, device: str) -> MatLike:
+    trfm = v2.Compose([v2.ToImage(), v2.ToDtype(torch.float32, scale=True)])
 
     color_map = {
         0: "yellow",
@@ -43,8 +44,22 @@ def put_labels(frame: MatLike, cnts: Sequence[MatLike], pos_name: str, model, de
     for i, c in enumerate(cnts):
         x, y, w, h = cv2.boundingRect(c)
         # rect = cv2.minAreaRect(c)
-        #ignore horizontal cards (heaven and hell)
-        card = frame[y: y + h, x: x + w, :]
+        # ignore horizontal cards (heaven and hell)
+
+        if is_horizontal_rect((x, y, w, h)):
+            dest = cv2.putText(
+                dest,
+                text=pos_name,
+                org=(x, y),
+                fontFace=cv2.FONT_HERSHEY_PLAIN,
+                fontScale=0.6,
+                color=(255, 255, 255),
+                thickness=1,
+                lineType=cv2.LINE_AA,
+            )
+            continue
+
+        card = img[y : y + h, x : x + w, :]
         ccolor = card_color(card)
         blob = trfm(card).unsqueeze(0).to(device)
         with torch.no_grad():
@@ -62,10 +77,8 @@ def put_labels(frame: MatLike, cnts: Sequence[MatLike], pos_name: str, model, de
 
     return dest
 
-def main():
-    cv2.namedWindow("preview", cv2.WINDOW_NORMAL)
-    # cv2.namedWindow("cropped", cv2.WINDOW_NORMAL)
 
+def main():
     seg_model, device = None, None
     device = "cuda:0" if torch.cuda.is_available() else "cpu"
     print(f"Running on the {device}")
@@ -85,6 +98,9 @@ def main():
     class_model_dict = torch.load("./training_models/resnet.pth")
     class_model.load_state_dict(class_model_dict["model_state_dict"])
     class_model = class_model.eval().to(device)
+
+    cv2.namedWindow("preview", cv2.WINDOW_NORMAL)
+    # cv2.namedWindow("cropped", cv2.WINDOW_NORMAL)
 
     cam = cv2.VideoCapture(cam_idxs[-1])
     rval = True
@@ -113,7 +129,7 @@ def main():
             # cnts = sorted(cnts, key=lambda x: cv2.contourArea(x), reverse=True)
             # if len(cnts) > 0:
             #     x, y, w, h = cv2.boundingRect(cnts[0])
-            #     cropped = frame[y:y + h, x: x + w]
+            #     cropped = frame[y : y + h, x : x + w]
             # cv2.imshow("cropped", cropped)
             bw = binarize_image(frame)
             cnts = card_contours(bw)
@@ -152,6 +168,7 @@ def main():
 
     cv2.destroyAllWindows()
     cam.release()
+
 
 if __name__ == "__main__":
     main()
