@@ -412,7 +412,7 @@ class Card:
         self.color = color
 
     def format(self) -> list[str]:
-        recursive_symbol = "↻"
+        recursive_symbol = "⟲"
         top_border = "╔{}╗".format("═" * (CARD_WIDTH - 2))
         bot_border = "╚{}╝".format("═" * (CARD_WIDTH - 2))
         header = "║{:02}{}{:02}║".format(

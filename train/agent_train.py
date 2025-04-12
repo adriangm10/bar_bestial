@@ -1,11 +1,13 @@
 import argparse
 import random
+import sys
 from typing import Literal
 
 from sb3_contrib import QRDQN, TRPO
 from stable_baselines3 import DQN, PPO
 from stable_baselines3.common.callbacks import BaseCallback
 
+sys.path.insert(0, "../bar_bestial/")
 from game.bar_gym import BarEnv
 
 

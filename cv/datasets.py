@@ -1,7 +1,6 @@
 import os
 import time
 
-import matplotlib.pyplot as plt
 import torch
 from torch.utils.data import Dataset
 from torchvision.io import decode_image
@@ -78,6 +77,8 @@ class CardDataset(Dataset):
 
 
 if __name__ == "__main__":
+    import matplotlib.pyplot as plt
+
     transforms = v2.Compose(
         [
             v2.ColorJitter(brightness=0, contrast=0, saturation=0, hue=0),
@@ -139,10 +140,10 @@ if __name__ == "__main__":
 
     transforms = v2.Compose(
         [
-            v2.ColorJitter(brightness=0.3, contrast=0.5, saturation=0.1, hue=0),
+            v2.ColorJitter(brightness=0.5, contrast=0.6, saturation=0.2, hue=0),
             v2.RandomVerticalFlip(),
             v2.RandomRotation((-10, 10), interpolation=InterpolationMode.BILINEAR, expand=True),
-            v2.Resize((100, 125)),
+            v2.RandomCrop((70, 50)),
             v2.ToDtype(torch.float32, scale=True),
         ]
     )
@@ -153,6 +154,7 @@ if __name__ == "__main__":
         1: "blue",
         2: "red",
         3: "green",
+        4: "special",
     }
     figure = plt.figure()
     for i in range(1, 10):
@@ -161,7 +163,7 @@ if __name__ == "__main__":
 
         figure.add_subplot(3, 3, i)
         plt.imshow(img.permute((1, 2, 0)))
-        plt.title(color_map[color] + "_" + str(force))
+        plt.title(color_map[color] + "_" + str(force + 1))
         plt.axis("off")
 
     plt.show()

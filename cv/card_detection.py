@@ -62,13 +62,13 @@ def card_positions(
     contours: Sequence[MatLike],
 ) -> tuple[MatLike | None, Sequence[MatLike], MatLike | None, Sequence[MatLike]]:
     """return: heaven, queue, hell, hand"""
-    sorted_cnts = sorted([(i, *cv2.boundingRect(cnt)) for i, cnt in enumerate(contours)], key=lambda b: b[2])
+    sorted_bboxs = sorted([(i, *cv2.boundingRect(cnt)) for i, cnt in enumerate(contours)], key=lambda b: b[2])
 
     top_group = []
     hand_group = []
     prev_y = None
     append_top = True
-    for i, _, y, _, _ in sorted_cnts:
+    for i, _, y, _, _ in sorted_bboxs:
         if append_top and (prev_y is None or abs(prev_y - y) < 50):
             top_group.append(contours[i])
         else:

@@ -1,16 +1,18 @@
 import os
 import sys
 
+sys.path.insert(0, "../bar_bestial/")
+
 import matplotlib.pyplot as plt
 import torch
-from datasets import BarDataset
 from torchvision.io import decode_image
 from torchvision.transforms import v2
-from uNet import UNet
+
+from cv.datasets import BarDataset
+from cv.uNet import UNet
 
 if __name__ == "__main__":
-
-    checkpoint = torch.load("./models/unet_mini_gray.pth")
+    checkpoint = torch.load("./training_models/unet_mini_gray.pth")
     model = UNet(1, 5, encoder_depth=3, firstl_channels=32)
     model.load_state_dict(checkpoint["model_state_dict"])
     model.eval()
@@ -38,21 +40,24 @@ if __name__ == "__main__":
     plt.legend()
     plt.tight_layout()
 
-    dataset = BarDataset("./cv/game_images_voc/", transform=v2.RandomHorizontalFlip(), combine_qs_and_hs=True)
+    trfm = v2.Compose([v2.RandomHorizontalFlip(), v2.Grayscale()])
+
+    dataset = BarDataset("./cv/game_images_voc/", transform=trfm, combine_qs_and_hs=True)
 
     figure = plt.figure()
     for i in range(1, 11, 2):
         idx = torch.randint(len(dataset), size=(1,)).item()
         img, mask = dataset[idx]
-        pred_mask = torch.argmax(model(v2.functional.rgb_to_grayscale(img).unsqueeze(0)), dim=1)
+        img = v2.functional.to_dtype(img, torch.float32, scale=False)
+        pred_mask = torch.argmax(model(img.unsqueeze(0)), dim=1)
 
         figure.add_subplot(5, 2, i)
-        plt.imshow(img.byte().permute((1, 2, 0)))
+        plt.imshow(img.permute((1, 2, 0)))
         plt.imshow(mask.permute((1, 2, 0)), alpha=0.7)
         plt.axis("off")
 
         figure.add_subplot(5, 2, i + 1)
-        plt.imshow(img.byte().permute((1, 2, 0)))
+        plt.imshow(img.permute((1, 2, 0)))
         plt.imshow(pred_mask.permute((1, 2, 0)), alpha=0.7)
         plt.axis("off")
 
@@ -70,20 +75,24 @@ if __name__ == "__main__":
         figure = plt.figure()
         files = sorted(os.listdir(sys.argv[1]), reverse=True)
         for i, f in enumerate(files[:6]):
-            img = decode_image(os.path.join(sys.argv[1], f)).float()
-            mask = torch.argmax(model(v2.functional.rgb_to_grayscale(img.unsqueeze(0))), dim=1)
+            img = decode_image(os.path.join(sys.argv[1], f))
+            img = trfm(img)
+            img = v2.functional.to_dtype(img, torch.float32, scale=False)
+            mask = torch.argmax(model(img.unsqueeze(0)), dim=1)
 
             figure.add_subplot(2, 3, i + 1)
-            plt.imshow(img.byte().permute((1, 2, 0)))
+            plt.imshow(img.permute((1, 2, 0)))
             plt.imshow(mask.permute((1, 2, 0)), alpha=0.7)
             plt.axis("off")
 
-        img = decode_image(os.path.join(sys.argv[1], files[-1])).float()
-        mask = torch.argmax(model(v2.functional.rgb_to_grayscale(img.unsqueeze(0))), dim=1)
+        img = decode_image(os.path.join(sys.argv[1], files[-1]))
+        img = trfm(img)
+        img = v2.functional.to_dtype(img, torch.float32, scale=False)
+        mask = torch.argmax(model(img.unsqueeze(0)), dim=1)
 
         figure = plt.figure()
         figure.add_subplot(3, 4, 1)
-        plt.imshow(img.byte().permute((1, 2, 0)))
+        plt.imshow(img.permute((1, 2, 0)))
         plt.imshow(mask.permute((1, 2, 0)), alpha=0.7)
         for i in range(1, 5):
             figure.add_subplot(3, 4, i + 1)
@@ -91,5 +100,3 @@ if __name__ == "__main__":
             plt.title(label_map[i])
 
     plt.show()
-
-
