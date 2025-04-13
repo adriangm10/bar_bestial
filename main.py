@@ -193,8 +193,10 @@ def cv_loop(model: RLModel, num_players: Literal[2, 3, 4], game_mode: Literal["f
                 logger.info(f"{new_heaven_cards} enter in heaven")
                 logger.info(f"{new_hell_card} goes to hell")
                 q = q_lbls[2:-1]
-            elif (hell_lbl and not hell) or (hell_lbl and hell_lbl not in hell):
+            elif (hell_lbl and not hell) or (hell_lbl and hell_lbl[0] not in hell):
                 new_hell_cards = [c for c in q if c not in q_lbls]
+                if hell_lbl[0] not in new_hell_cards:
+                    new_hell_cards.append(hell_lbl[0])
                 hell.extend(new_hell_cards)
                 logger.info(f"{new_hell_cards} went to hell")
                 hand = hand_lbls
@@ -210,14 +212,13 @@ def cv_loop(model: RLModel, num_players: Literal[2, 3, 4], game_mode: Literal["f
 
             hand.sort(key=lambda x: x[1])
             while True:
-
                 state = create_state_rep(
                     heaven, hell, q, hand, color_pos_map, chosen_card=chosen_card, num_players=num_players, game_mode=game_mode
                 )
 
                 if state[1:].sum() == num_cards:
                     print("game has ended, count cards in heaven to see the winner")
-                    break
+                    return
 
                 logger.debug(state)
                 action, _ = model.predict(state)
@@ -228,13 +229,14 @@ def cv_loop(model: RLModel, num_players: Literal[2, 3, 4], game_mode: Literal["f
                     print(f"The AI plays {card}")
 
                     if card.has_action():
-                        chosen_card = hand[action]
+                        chosen_card = hand.pop(action)
                     else:
                         chosen_card = None
                         break
                 else:
                     # camaleon
                     if chosen_card[1] == 5:
+                        action = min(action, len(q))
                         card = Card(CardType(q[action][1]), Color(q[action][0]))
                         print(f"The camaleon transforms into {card}")
                         if card.has_action():
