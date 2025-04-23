@@ -62,26 +62,45 @@ def card_positions(
     contours: Sequence[MatLike],
 ) -> tuple[MatLike | None, Sequence[MatLike], MatLike | None, Sequence[MatLike]]:
     """return: heaven, queue, hell, hand"""
+    # sorted card bboxes by y coordinate
     sorted_bboxs = sorted([(i, *cv2.boundingRect(cnt)) for i, cnt in enumerate(contours)], key=lambda b: b[2])
 
-    top_group = []
-    hand_group = []
+    current_group = []
+    card_groups = []  # queue, hell/heaven, hand from top to bottom of the img
     prev_y = None
-    append_top = True
     for i, _, y, _, _ in sorted_bboxs:
-        if append_top and (prev_y is None or abs(prev_y - y) < 50):
-            top_group.append(contours[i])
+        if prev_y is None or abs(prev_y - y) < 50:
+            current_group.append(contours[i])
         else:
-            append_top = False
-            hand_group.append(contours[i])
+            card_groups.append(current_group)
+            current_group = [contours[i]]
 
         prev_y = y
 
-    top_group.sort(key=lambda cnt: cv2.boundingRect(cnt)[0])
-    hand_group.sort(key=lambda cnt: cv2.boundingRect(cnt)[0])
-    if len(top_group) < 2:
-        return None, [], None, hand_group
-    return top_group[0], top_group[1:-1], top_group[-1], hand_group
+    if current_group:
+        card_groups.append(current_group)
+
+    # order cards by x coordinate
+    for group in card_groups:
+        group.sort(key=lambda cnt: cv2.boundingRect(cnt)[0])
+
+    if not card_groups:
+        return None, [], None, []
+    if len(card_groups) <= 2:
+        return None, card_groups[0], None, card_groups[1] if len(card_groups) == 2 else []
+
+    queue = card_groups[0]
+    heaven, hell = None, None
+    if len(card_groups[1]) == 2:
+        heaven, hell = card_groups[1]
+    else:
+        x, _, _, _ = cv2.boundingRect(card_groups[1][0])
+        if abs(x - cv2.boundingRect(queue[0])[0]) < abs(x - cv2.boundingRect(queue[-1])[0]):
+            heaven = card_groups[1][0]
+        else:
+            hell = card_groups[1][0]
+
+    return heaven, queue, hell, card_groups[2]
 
 
 def put_labels(cnts: Sequence[MatLike], label: str, img: MatLike) -> MatLike:
