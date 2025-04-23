@@ -124,7 +124,7 @@ def cv_loop(model: RLModel, num_players: Literal[2, 3, 4], game_mode: Literal["f
 
     cam_idxs = camera_idxs()
     cam = cv2.VideoCapture(cam_idxs[-1])
-    class_model = get_class_model("./training_models/resnet.pth").eval().to(device)
+    class_model = get_class_model(ws_file="./training_models/resnet.pth").eval().to(device)
     cv2.namedWindow("preview", cv2.WINDOW_NORMAL)
 
     while True:

@@ -6,22 +6,37 @@ from torch import nn
 from torchvision import models
 
 
-def card_color(img: MatLike) -> int:
-    # (h, s, v)
+def card_color(card: MatLike) -> int:
+    # # (h, s, v)
     boundaries = [
-        ((20, 50, 50), (40, 255, 255)),  # yellow
-        ((100, 50, 50), (120, 255, 255)),  # blue
-        ((160, 50, 50), (180, 255, 255)),  # red
-        ((50, 50, 50), (80, 255, 255)),  # green
+        ((20, 80, 80), (40, 255, 255)),  # yellow
+        ((100, 80, 80), (120, 255, 255)),  # blue
+        ((160, 80, 80), (180, 255, 255)),  # red
+        ((50, 80, 80), (80, 255, 255)),  # green
     ]
 
-    img_hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
+    height, width = card.shape[:2]
+    mask = np.zeros((height, width), dtype=np.uint8)
+
+    top = int(0.15 * height)
+    bottom = height - top
+    left = int(0.20 * width)
+    right = width - left
+
+    mask[:top, :] = 255
+    mask[bottom:, :] = 255
+    mask[:, :left] = 255
+    mask[:, right:] = 255
+
+    masked_card = cv2.bitwise_and(card, card, mask=mask)
+
+    img_hsv = cv2.cvtColor(masked_card, cv2.COLOR_BGR2HSV)
     return np.argmax([cv2.countNonZero(cv2.inRange(img_hsv, lowb, highb)) for lowb, highb in boundaries])  # type: ignore
 
 
-def get_class_model(ws_file: str | None = None) -> models.ResNet:
+def get_class_model(num_class: int = 12, ws_file: str | None = None) -> models.ResNet:
     model = models.resnet18()
-    model.fc = nn.Linear(model.fc.in_features, 12)
+    model.fc = nn.Linear(model.fc.in_features, num_class)
     if ws_file:
         ws = torch.load(ws_file)
         model.load_state_dict(ws["model_state_dict"])
