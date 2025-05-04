@@ -84,11 +84,22 @@ def card_positions(
     for group in card_groups:
         group.sort(key=lambda cnt: cv2.boundingRect(cnt)[0])
 
+    # no card is detected
     if not card_groups:
         return None, [], None, []
+
+    # only queue and hand or queue and heaven and hell
     if len(card_groups) <= 2:
+        if len(card_groups) == 2 and len(card_groups[1]) == 2:
+            xheaven, _, _, _ = cv2.boundingRect(card_groups[0][0])
+            xhell, _, _, _ = cv2.boundingRect(card_groups[0][-1])
+
+            if abs(xheaven - cv2.boundingRect(card_groups[1][0])[0]) < 10 and abs(xhell - cv2.boundingRect(card_groups[1][-1])[0]) < 10:
+                return card_groups[1][0], card_groups[0], card_groups[1][1], []
+
         return None, card_groups[0], None, card_groups[1] if len(card_groups) == 2 else []
 
+    # heaven, queue, hell and hand detected
     queue = card_groups[0]
     heaven, hell = None, None
     if len(card_groups[1]) == 2:
