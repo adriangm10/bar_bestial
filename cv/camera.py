@@ -18,12 +18,6 @@ def camera_idxs():
     return arr
 
 
-def is_horizontal_rect(rect: tuple[float, float, float, float], aspect_ratio_thresh: float = 1.5):
-    _, _, w, h = rect
-    aspect_ratio = w / h if h != 0 else 0
-    return aspect_ratio > aspect_ratio_thresh
-
-
 def put_labels(
     img: MatLike,
     cnts: Sequence[MatLike],
@@ -31,7 +25,7 @@ def put_labels(
     model,
     dest: MatLike,
     device: str,
-    color: tuple[int, int, int] = (255, 255, 255),
+    color: tuple[int, int, int] = (255, 10, 210),
     thickness: int = 1,
 ) -> tuple[MatLike, list[tuple[int, int]]]:
     trfm = v2.Compose([v2.ToImage(), v2.ToDtype(torch.float32, scale=True)])
@@ -46,21 +40,6 @@ def put_labels(
 
     for i, c in enumerate(cnts):
         x, y, w, h = cv2.boundingRect(c)
-        # rect = cv2.minAreaRect(c)
-        # ignore horizontal cards (heaven and hell)
-
-        if is_horizontal_rect((x, y, w, h)):
-            dest = cv2.putText(
-                dest,
-                text=pos_name,
-                org=(x, y),
-                fontFace=cv2.FONT_HERSHEY_PLAIN,
-                fontScale=0.6,
-                color=color,
-                thickness=thickness,
-                lineType=cv2.LINE_AA,
-            )
-            continue
 
         card = img[y : y + h, x : x + w, :]
         ccolor = card_color(card)
@@ -75,8 +54,8 @@ def put_labels(
             org=(x, y),
             fontFace=cv2.FONT_HERSHEY_PLAIN,
             fontScale=0.6,
-            color=(255, 255, 255),
-            thickness=1,
+            color=color,
+            thickness=thickness,
             lineType=cv2.LINE_AA,
         )
 
