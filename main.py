@@ -13,7 +13,7 @@ from game.bar_gym import BarEnv
 type RLModel = QRDQN | DQN | TRPO | PPO
 type CardRep = tuple[int, int]  # color, force
 
-logger = logging.getLogger()
+logger = logging.getLogger("bar bestial")
 
 
 def load_model(file: str, model_class: str):
@@ -265,12 +265,12 @@ def cv_auto(model: RLModel, num_players: Literal[2, 3, 4], game_mode: Literal["f
         if key == 27:  # escape
             break
 
-        error = log_error(
+        if log_error(
             len(frame_q) < 2 and game_started and stable_frame_counter >= STABLE_FRAME_TRESHOLD,
             "Heaven door and kick cards aren't being detected",
             error,
-        )
-        if error:
+        ):
+            error = True
             continue
         elif game_started:
             frame_q = frame_q[1:-1]
@@ -284,29 +284,29 @@ def cv_auto(model: RLModel, num_players: Literal[2, 3, 4], game_mode: Literal["f
         frame_cnts, hand_lbls = put_labels(frame, frame_hand, "h", class_model, frame_cnts, device)
 
         if game_started and stable_frame_counter >= STABLE_FRAME_TRESHOLD:
-            error = log_error(
+            if log_error(
                 not bool(hell_lbl) and bool(hell) or not bool(heaven_lbl) and bool(heaven),
                 "Detection error, the hell or heaven card disapeared",
                 error,
-            )
-            if error:
+            ):
+                error = True
                 continue
 
             l = len([c for c in q_lbls if c not in q])
-            error = log_error(l > 1, f"{l} changes have been detected in the queue which is not possible.", error)
-            if error:
+            if log_error(l > 1, f"{l} changes have been detected in the queue which is not possible.", error):
+                error = True
                 continue
 
-            error = log_error(len(hand) > 1 and not hand_lbls, f"Hand cards are not being detected", error)
-            if error:
+            if log_error(len(hand) > 1 and not hand_lbls, f"Hand cards are not being detected", error):
+                error = True
                 continue
 
-            error = log_error(
-                len([c for c in hand_lbls if c not in hand]) > 1 or abs(len(hand) - len(hand_lbls)) > 1 or any([c != ai_color for c, _ in hand]),
-                f"The hand is not being correctly detected hand: {hand}, hand_lbls: {hand_lbls}",
+            if log_error(
+                len([c for c in hand_lbls if c not in hand]) > 1 or abs(len(hand) - len(hand_lbls)) > 1 or any([c != ai_color for c, _ in hand_lbls]),
+                f"The hand is not being correctly detected; hand: {hand}, hand_lbls: {hand_lbls}",
                 error,
-            )
-            if error:
+            ):
+                error = True
                 continue
 
             hand = hand_lbls
@@ -326,7 +326,7 @@ def cv_auto(model: RLModel, num_players: Literal[2, 3, 4], game_mode: Literal["f
                         logger.info(f"updated heaven: {heaven}")
 
                     turn = (turn + 1) % num_players
-                    logger.info(f"The queue has been correctly updated, next turn is for player {turn}.")
+                    logger.info(f"----------The queue has been correctly updated, next turn is for player {turn}.-------------")
                     poss_hells, poss_queues, poss_heavens = None, None, None
                     agent_actions.clear()
                     played_card = None
@@ -335,21 +335,21 @@ def cv_auto(model: RLModel, num_players: Literal[2, 3, 4], game_mode: Literal["f
 
             # there is a new card in q
             elif len(q_lbls) - len(q) == 1:
-                error = log_error(
+                if log_error(
                     len(color_pos_map) == num_players and q_lbls[-1][0] not in color_pos_map,
                     f"""The color of the new card is being wrongly detected or there are too many players.
                             Number of players that were supposed to be: {num_players}""",
                     error,
-                )
-                if error:
+                ):
+                    error = True
                     continue
 
-                error = log_error(
+                if log_error(
                     played_card is not None and played_card != q_lbls[-1],
                     f"The agent played card {played_card} but the last card in the queue is {q_lbls[-1]}",
                     error,
-                )
-                if error:
+                ):
+                    error = True
                     continue
 
                 logger.info(f"Card {q_lbls[-1]} has been played.")
@@ -383,11 +383,13 @@ def cv_auto(model: RLModel, num_players: Literal[2, 3, 4], game_mode: Literal["f
                         game_mode=game_mode,
                     )
 
-                    logger.debug("generated state:\n", state)
+                    logger.debug(f"generated state:\n{state}")
                     option, _ = model.predict(state)
                     logger.info(f"The AI chooses action {option}")
 
                     if chosen_card is None:
+                        if option >= len(sorted_hand):
+                            option = choice(list(range(len(sorted_hand))))
                         card = Card(CardType(sorted_hand[option][1]), Color(sorted_hand[option][0]))
                         played_card = sorted_hand[option]
                         logger.info(f"The AI plays {card}")
@@ -437,6 +439,7 @@ def cv_auto(model: RLModel, num_players: Literal[2, 3, 4], game_mode: Literal["f
                     print("GAME ENDED, count cards in heaven to see the winner")
                     return
 
+        error = False
         if key == 13:  # intro
             if stable_frame_counter < STABLE_FRAME_TRESHOLD:
                 logger.error("There is movement on the scene, the game cannot start.")
