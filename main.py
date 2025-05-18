@@ -709,10 +709,27 @@ def main():
         use as input for the model in real time, if this argument is defined only one agent is available to play,
         the rest must be humans. At the end of every turn (AI included) the intro button must be pressed.""",
     )
+    parser.add_argument(
+        "--debug",
+        action="store_true",
+        help="Set logging level to debug"
+    )
 
     args = parser.parse_args()
     model = None
-    logging.basicConfig(level=logging.DEBUG)
+
+    if args.agent_v_agent:
+        model1 = load_model(args.agent_v_agent[0], args.agent1_class)
+        model2 = load_model(args.agent_v_agent[1], args.agent2_class)
+        env = BarEnv(num_players=args.num_players, game_mode=args.game_mode)
+        wins1, wins2, draws = model_v_model(model1, model2, args.num_games, env)
+        print(f"Model1: {args.agent_v_agent[0]} wins {wins1} times.")
+        print(f"Model2: {args.agent_v_agent[1]} wins {wins2} times.")
+        print(f"They draw {draws} times.")
+        exit(0)
+
+    level = logging.DEBUG if args.debug else logging.INFO
+    logging.basicConfig(level=level)
 
     if args.agent:
         model = load_model(args.agent, args.agent1_class)
@@ -725,16 +742,6 @@ def main():
     if args.cv_auto:
         assert model is not None, "--agent must be defined to play"
         cv_auto(model, args.num_players, args.game_mode)
-        exit(0)
-
-    if args.agent_v_agent:
-        model1 = load_model(args.agent_v_agent[0], args.agent1_class)
-        model2 = load_model(args.agent_v_agent[1], args.agent2_class)
-        env = BarEnv(num_players=args.num_players, game_mode=args.game_mode)
-        wins1, wins2, draws = model_v_model(model1, model2, args.num_games, env)
-        print(f"Model1: {args.agent_v_agent[0]} wins {wins1} times.")
-        print(f"Model2: {args.agent_v_agent[1]} wins {wins2} times.")
-        print(f"They draw {draws} times.")
         exit(0)
 
     env = BarEnv(game_mode=args.game_mode, render_mode="human", t=1, num_players=args.num_players)
