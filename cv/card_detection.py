@@ -1,3 +1,4 @@
+import logging
 import os
 from typing import Sequence
 
@@ -7,6 +8,8 @@ from cv2.typing import MatLike
 
 MIN_CARD_AREA = 5000
 MAX_CARD_AREA = int(2.5 * MIN_CARD_AREA)
+
+logger = logging.getLogger(__name__)
 
 
 def binarize_image(img: MatLike) -> MatLike:
@@ -91,11 +94,14 @@ def card_positions(
     # only queue and hand or queue and heaven and hell
     if len(card_groups) <= 2:
         if len(card_groups) == 2 and len(card_groups[1]) == 2:
+            logger.debug("Only two groups detected and only 2 cards in the second one, checking if it's the hand or the hell and heaven")
             xheaven, _, _, _ = cv2.boundingRect(card_groups[0][0])
             xhell, _, _, _ = cv2.boundingRect(card_groups[0][-1])
 
-            if abs(xheaven - cv2.boundingRect(card_groups[1][0])[0]) < 10 and abs(xhell - cv2.boundingRect(card_groups[1][-1])[0]) < 10:
+            if abs(xheaven - cv2.boundingRect(card_groups[1][0])[0]) < 25 and abs(xhell - cv2.boundingRect(card_groups[1][-1])[0]) < 25:
+                logger.debug("The second group corresponds to the heaven and hell")
                 return card_groups[1][0], card_groups[0], card_groups[1][1], []
+            logger.debug("The second group corresponds to the hand")
 
         return None, card_groups[0], None, card_groups[1] if len(card_groups) == 2 else []
 
