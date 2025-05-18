@@ -130,7 +130,11 @@ if __name__ == "__main__":
     }
 
     parser.add_argument(
-        "--alg", type=str, choices=["DQN", "PPO", "QRDQN", "TRPO"], default="DQN", help="RL algorithm to use"
+        "--alg",
+        type=str,
+        choices=["DQN", "PPO", "QRDQN", "TRPO"],
+        default="DQN",
+        help="RL algorithm to use, default is DQN",
     )
     parser.add_argument(
         "--num-players",
@@ -205,5 +209,5 @@ if __name__ == "__main__":
     model.save(args.save_model_file)
 
     # model = DQN.load("models/dqn/t1p2finaldqn")
-    wins, losses, draws = model_v_random(model, num_games=1000, game_mode="full", t=1, num_players=2)
+    wins, losses, draws = model_v_random(model, num_games=1000, game_mode=args.game_mode, t=1, num_players=2)
     print(f"wins: {wins}, losses: {losses}, draws: {draws}")
