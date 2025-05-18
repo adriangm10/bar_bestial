@@ -1,10 +1,11 @@
 import argparse
 import os
 import sys
+from random import randint
 
 import torch
 from torch import nn
-from torch.utils.data import DataLoader, random_split
+from torch.utils.data import DataLoader, Subset
 from torchvision.transforms import InterpolationMode, v2
 
 sys.path.insert(0, "../bar_bestial/")
@@ -18,18 +19,23 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(prog="card classification")
     parser.add_argument("--load", type=str, default=None, help="File to load the model from")
     parser.add_argument(
-        "--train", type=str, default=None, help="File to save the trained model (without file extension)"
+        "--train", type=str, default=None, help="File name to save the trained model (without file extension)"
     )
     args = parser.parse_args()
 
     if args.train:
         dataset = CardDataset("./cv/card_images/")
-        train_dataset, test_dataset = random_split(dataset, [0.8, 0.2])
+
+        # 4 photos per card, 48 cards in total, take 1 of the 4 randomly for test
+        idxs = set(range(len(dataset)))
+        test_idxs = [randint(0, 3) + i * 4 for i in range(48)]
+        train_idxs = idxs.difference(test_idxs)
+        train_dataset, test_dataset = Subset(dataset, list(train_idxs)), Subset(dataset, test_idxs)
 
         trfm = v2.Compose(
             [
                 v2.ColorJitter(brightness=0.5, contrast=0.6, saturation=0.2, hue=0),
-                v2.RandomVerticalFlip(),
+                v2.RandomApply([v2.RandomRotation((180, 180))], p=0.5),
                 v2.RandomRotation((-10, 10), interpolation=InterpolationMode.BILINEAR, expand=True),
                 v2.RandomCrop((70, 50)),
                 v2.ToDtype(torch.float32, scale=True),
@@ -65,32 +71,30 @@ if __name__ == "__main__":
             t = len(train_losses)
             epochs = t + 1000
 
-            for t in range(t, epochs):
-                print(f"Epoch {t + 1}\n----------------------------")
-                train_loss, train_acc = train_loop(train_dataloader, model, loss_fn, optimizer, device)
-                train_losses.append(train_loss)
-                train_accs.append(train_acc)
-                print(f"train loss: {train_loss}, train force acc: {train_acc}")
-                test_loss, test_acc = test_loop(test_dataloader, model, loss_fn, device)
-                test_losses.append(test_loss)
-                test_accs.append(test_acc)
-                print(f"test_loss: {test_loss}, test force acc: {test_acc}\n")
+        for t in range(t, epochs):
+            print(f"Epoch {t + 1}\n----------------------------")
+            train_loss, train_acc = train_loop(train_dataloader, model, loss_fn, optimizer, device)
+            train_losses.append(train_loss)
+            train_accs.append(train_acc)
+            print(f"train loss: {train_loss}, train force acc: {train_acc}")
+            test_loss, test_acc = test_loop(test_dataloader, model, loss_fn, device)
+            test_losses.append(test_loss)
+            test_accs.append(test_acc)
+            print(f"test_loss: {test_loss}, test force acc: {test_acc}\n")
 
-            model.eval()
-            # example_inputs = torch.randn(1, 3, 640, 480)
-            # torch.onnx.export(model, example_inputs, save_file_name + ".onnx", verbose=True, dynamo=True, optimize=True)
-            torch.save(
-                {
-                    "model_state_dict": model.state_dict(),
-                    "optim_state_dict": optimizer.state_dict(),
-                    "train_accs": train_accs,
-                    "train_loss": train_losses,
-                    "test_accs": test_accs,
-                    "test_loss": test_losses,
-                },
-                args.train + ".pth",
-            )
-            print(f"model saved in {args.train}.pth")
+        model.eval()
+        torch.save(
+            {
+                "model_state_dict": model.state_dict(),
+                "optim_state_dict": optimizer.state_dict(),
+                "train_accs": train_accs,
+                "train_loss": train_losses,
+                "test_accs": test_accs,
+                "test_loss": test_losses,
+            },
+            args.train + ".pth",
+        )
+        print(f"model saved in {args.train}.pth")
     else:
         assert args.load is not None, "at least --load or --train must be defined"
         import cv2
