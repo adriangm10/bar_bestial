@@ -1,5 +1,4 @@
 import logging
-import os
 from typing import Sequence
 
 import cv2
@@ -135,31 +134,3 @@ def put_labels(cnts: Sequence[MatLike], label: str, img: MatLike) -> MatLike:
         )
 
     return img
-
-
-if __name__ == "__main__":
-    cv2.namedWindow("preview", cv2.WINDOW_NORMAL)
-
-    img_dir = "./cv/game_images/"
-    imgs = os.listdir(img_dir)
-    for f in imgs:
-        img = cv2.imread(os.path.join(img_dir, f))
-        th = binarize_image(img)
-
-        cnts = card_contours(th)
-        cnts = separate_cards(img, cnts)
-        img_cnt = img.copy()
-        cv2.drawContours(img_cnt, cnts, -1, (0, 255, 0), 1)
-
-        heaven, q, hell, hand = card_positions(cnts)
-        if heaven is not None:
-            img_cnt = put_labels([heaven], "heaven", img_cnt)
-        img_cnt = put_labels(q, "q", img_cnt)
-        if hell is not None:
-            img_cnt = put_labels([hell], "hell", img_cnt)
-        img_cnt = put_labels(hand, "h", img_cnt)
-
-        cv2.imshow("preview", img_cnt)
-        cv2.waitKey()
-
-    cv2.destroyAllWindows()
