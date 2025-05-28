@@ -120,7 +120,7 @@ if __name__ == "__main__":
         for i in range(0, len(imgs), 4):
             img = cv2.imread(os.path.join(img_dir, imgs[i]))
             if torch.rand((1,)).item() > 0.5:
-                img = cv2.flip(img, 0)
+                img = cv2.rotate(img, cv2.ROTATE_180)
             color = card_color(img)
 
             blob = trfm(img).unsqueeze(0).to(device)
