@@ -1,6 +1,7 @@
 from typing import Sequence
 
 import cv2
+import numpy as np
 import torch
 from cv2.typing import MatLike
 from torchvision.transforms import v2
@@ -37,11 +38,14 @@ def put_labels(
         3: "green",
     }
     labels = []
+    mask = np.zeros((img.shape[0], img.shape[1], 1), dtype=np.uint8)
+    cv2.drawContours(mask, cnts, -1, (255, 255, 255), cv2.FILLED)
+    cards = cv2.bitwise_and(img, img, mask=mask)
 
     for i, c in enumerate(cnts):
         x, y, w, h = cv2.boundingRect(c)
 
-        card = img[y : y + h, x : x + w, :]
+        card = cards[y : y + h, x : x + w, :]
         ccolor = card_color(card)
         blob = trfm(card).unsqueeze(0).to(device)
         with torch.no_grad():
