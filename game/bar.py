@@ -159,7 +159,20 @@ class CardType(Enum):
             logger.error("serpiente_action: the card in cards[card_pos] is none")
             raise ValueError("cards[card_pos] is None")
         logger.info(f"serpiente_action: the {cards[card_pos]} orders the queue based on the force of each animal")
-        return sorted(cards[: card_pos + 1], reverse=True) + [None] * (QUEUE_LEN - card_pos - 1), hell  # type: ignore[type-var]
+        sorted_q = sorted(cards[:card_pos], reverse=True)
+        res = []
+        put = False
+        for c in sorted_q:
+            if c.value < cls.SERPIENTE.value and not put:
+                res.append(cards[card_pos])
+                put = True
+            res.append(c)
+
+        if len(res) == len(sorted_q):
+            res.append(cards[card_pos])
+
+        return res + [None] * (QUEUE_LEN - card_pos -1), hell
+        # return sorted(cards[: card_pos + 1], reverse=True) + [None] * (QUEUE_LEN - card_pos - 1), hell  # type: ignore[type-var]
 
     @classmethod
     def jirafa_action(
