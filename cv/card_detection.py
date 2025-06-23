@@ -28,7 +28,7 @@ def card_contours(thimg: MatLike) -> Sequence[MatLike]:
     for i, contour in enumerate(contours):
         area = cv2.contourArea(contour)
 
-        if area > MIN_CARD_AREA and hier[0][i][3] == -1:
+        if MAX_CARD_AREA >= area >= MIN_CARD_AREA and hier[0][i][3] == -1:  #and len(approx) == 4:
             cnts.append(contour)
 
     return cnts
@@ -49,10 +49,10 @@ def separate_cards(img: MatLike, contours: Sequence[MatLike]):
         filtered_cnts = []
         for i, cnt in enumerate(cnts):
             area = cv2.contourArea(cnt)
-            epsilon = 0.1 * cv2.arcLength(cnt, True)
-            approx = cv2.approxPolyDP(cnt, epsilon, True)
+            # epsilon = 0.1 * cv2.arcLength(cnt, True)
+            # approx = cv2.approxPolyDP(cnt, epsilon, True)
 
-            if MAX_CARD_AREA >= area >= MIN_CARD_AREA and hier[0][i][3] == 0 and len(approx) == 4:
+            if MAX_CARD_AREA >= area >= MIN_CARD_AREA and hier[0][i][3] == 0:  #and len(approx) == 4:
                 filtered_cnts.append(cnt)
 
         total_cnts.extend(filtered_cnts)
@@ -93,14 +93,13 @@ def card_positions(
     # only queue and hand or queue and heaven and hell
     if len(card_groups) <= 2:
         if len(card_groups) == 2 and len(card_groups[1]) == 2:
-            logger.debug("Only two groups detected and only 2 cards in the second one, checking if it's the hand or the hell and heaven")
             xheaven, _, _, _ = cv2.boundingRect(card_groups[0][0])
             xhell, _, _, _ = cv2.boundingRect(card_groups[0][-1])
 
-            if abs(xheaven - cv2.boundingRect(card_groups[1][0])[0]) < 25 and abs(xhell - cv2.boundingRect(card_groups[1][-1])[0]) < 25:
-                logger.debug("The second group corresponds to the heaven and hell")
+            if abs(xheaven - cv2.boundingRect(card_groups[1][0])[0]) < 50 and abs(xhell - cv2.boundingRect(card_groups[1][-1])[0]) < 50:
+                logger.debug("Only queue, heaven and hell detected")
                 return card_groups[1][0], card_groups[0], card_groups[1][1], []
-            logger.debug("The second group corresponds to the hand")
+            logger.debug("Only queue and hand detected")
 
         return None, card_groups[0], None, card_groups[1] if len(card_groups) == 2 else []
 

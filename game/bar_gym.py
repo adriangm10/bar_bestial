@@ -167,15 +167,15 @@ class BarEnv(gym.Env):
             self.game.play_card(act)
             self.obs = self._get_obs()
 
-        if self.num_players == 2:
-            agent_heaven = len([c for c in self.game.heaven if c.color == self.agent_color])
-            opponent_heaven = len(self.game.heaven) - agent_heaven
-            if agent_heaven > self.agent_heaven:
-                reward += agent_heaven - self.agent_heaven
-                self.agent_heaven = agent_heaven
-            if opponent_heaven > self.opponent_heaven:
-                reward -= opponent_heaven - self.opponent_heaven
-                self.opponent_heaven = opponent_heaven
+        #if self.num_players == 2:
+        #    agent_heaven = len([c for c in self.game.heaven if c.color == self.agent_color])
+        #    opponent_heaven = len(self.game.heaven) - agent_heaven
+        #    if agent_heaven > self.agent_heaven:
+        #        reward += agent_heaven - self.agent_heaven
+        #        self.agent_heaven = agent_heaven
+        #    if opponent_heaven > self.opponent_heaven:
+        #        reward -= opponent_heaven - self.opponent_heaven
+        #        self.opponent_heaven = opponent_heaven
 
         # done = self.game.finished()
         if done := self.game.finished():

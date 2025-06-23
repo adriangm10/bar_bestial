@@ -1,7 +1,6 @@
 import argparse
 import os
 import sys
-from random import randint
 
 import torch
 from torch import nn
@@ -16,21 +15,22 @@ if __name__ == "__main__":
     device = "cuda" if torch.cuda.is_available() else "cpu"
     print(f"Running on the {device} device")
 
-    parser = argparse.ArgumentParser(prog="card classification")
+    parser = argparse.ArgumentParser(prog="train classification model")
     parser.add_argument("--load", type=str, default=None, help="File to load the model from")
     parser.add_argument(
         "--train", type=str, default=None, help="File name to save the trained model (without file extension)"
     )
     args = parser.parse_args()
+    torch.manual_seed(0)
 
     if args.train:
-        dataset = CardDataset("./cv/card_images/")
+        train_dataset = CardDataset("./cv/card_images/")
 
         # 4 photos per card, 48 cards in total, take 1 of the 4 randomly for test
-        idxs = set(range(len(dataset)))
-        test_idxs = [randint(0, 3) + i * 4 for i in range(48)]
-        train_idxs = idxs.difference(test_idxs)
-        train_dataset, test_dataset = Subset(dataset, list(train_idxs)), Subset(dataset, test_idxs)
+        # idxs = set(range(len(dataset)))
+        # test_idxs = [torch.randint(3, size=(1,)).item() + i * 4 for i in range(48)]
+        # train_idxs = idxs.difference(test_idxs)
+        # train_dataset, test_dataset = Subset(dataset, list(train_idxs)), Subset(dataset, test_idxs)
 
         trfm = v2.Compose(
             [
@@ -42,17 +42,17 @@ if __name__ == "__main__":
             ]
         )
 
-        train_dataset.dataset.transform = trfm
+        train_dataset.transform = trfm
 
         batch_size = 20
         lr = 1e-4
-        epochs = 1000
+        epochs = 5000
         t = 0
 
         train_dataloader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
-        test_dataloader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
+        # test_dataloader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
 
-        model = get_class_model().to(device)
+        model = get_class_model(pretrained=False, device=device).to(device)
 
         print("Number of parameters of the model:", sum(p.numel() for p in model.parameters() if p.requires_grad))
         optimizer = torch.optim.Adam(model.parameters(), lr=lr)
@@ -76,11 +76,11 @@ if __name__ == "__main__":
             train_loss, train_acc = train_loop(train_dataloader, model, loss_fn, optimizer, device)
             train_losses.append(train_loss)
             train_accs.append(train_acc)
-            print(f"train loss: {train_loss}, train force acc: {train_acc}")
-            test_loss, test_acc = test_loop(test_dataloader, model, loss_fn, device)
-            test_losses.append(test_loss)
-            test_accs.append(test_acc)
-            print(f"test_loss: {test_loss}, test force acc: {test_acc}\n")
+            print(f"train loss: {train_loss}, train force acc: {train_acc}\n")
+            # test_loss, test_acc = test_loop(test_dataloader, model, loss_fn, device)
+            # test_losses.append(test_loss)
+            # test_accs.append(test_acc)
+            # print(f"test_loss: {test_loss}, test force acc: {test_acc}\n")
 
         model.eval()
         torch.save(
