@@ -29,11 +29,14 @@ def card_color(card: MatLike) -> int:
     return np.argmax([cv2.countNonZero(cv2.inRange(img_hsv, lowb, highb)) for lowb, highb in boundaries])  # type: ignore
 
 
-def get_class_model(num_class: int = 12, ws_file: str | None = None) -> models.ResNet:
-    model = models.resnet18()
+def get_class_model(
+    num_class: int = 12, ws_file: str | None = None, pretrained: bool = False, device: str = "cuda"
+) -> models.ResNet:
+    ws = "DEFAULT" if pretrained or ws_file is None else None
+    model = models.resnet18(weights=ws)
     model.fc = nn.Linear(model.fc.in_features, num_class)
     if ws_file:
-        ws = torch.load(ws_file)
+        ws = torch.load(ws_file, map_location=device)
         model.load_state_dict(ws["model_state_dict"])
     return model
 
