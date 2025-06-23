@@ -1,6 +1,6 @@
 import argparse
 import logging
-from random import choice, randint
+import random
 from typing import Literal
 
 import numpy as np
@@ -31,33 +31,30 @@ def load_model(file: str, model_class: str):
     return model
 
 
-def model_v_model(model1, model2, num_games: int, env: BarEnv) -> tuple[int, int, int]:
-    wins1, wins2, draws = 0, 0, 0
+def model_v_model(models, num_games: int, env: BarEnv) -> tuple[list[int], int]:
+    wins = [0 for _ in models]
+    draws = 0
 
     for _ in range(num_games):
         obs, _ = env.reset()
+
         while True:
             poss_actions = env.game.possible_actions()
-            if env.game.turn == env.agent_color.value:
-                action, _ = model1.predict(obs)
-            else:
-                action, _ = model2.predict(obs)
+            action, _ = models[env.game.turn].predict(obs)
 
             if poss_actions and action not in poss_actions:
-                action = choice(poss_actions)
+                action = random.choice(poss_actions)
 
             obs, _, terminated, truncated, _ = env.step(action)
             if terminated or truncated:
                 winners = env.game.winners()
                 if len(winners) == env.num_players or not winners:
                     draws += 1
-                elif env.agent_color in winners:
-                    wins1 += 1
-                else:
-                    wins2 += 1
+                for c in winners:
+                    wins[c.value] += 1
                 break
 
-    return wins1, wins2, draws
+    return wins, draws
 
 
 def create_state_rep(
@@ -208,8 +205,8 @@ def cv_auto(model: RLModel, num_players: Literal[2, 3, 4], game_mode: Literal["f
     heaven, hell, q, hand, color_pos_map = [], [], [], [], []
     chosen_card = None
     num_cards = 12 * num_players if game_mode != "basic" else 9 * num_players
-    turn = randint(0, num_players - 1)
-    agent_turn = randint(0, num_players - 1)
+    turn = random.randint(0, num_players - 1)
+    agent_turn = 0
     poss_hells, poss_queues, poss_heavens = None, None, None
     agent_actions = []
     ai_color = 0
@@ -217,7 +214,7 @@ def cv_auto(model: RLModel, num_players: Literal[2, 3, 4], game_mode: Literal["f
 
     cam_idxs = camera_idxs()
     cam = cv2.VideoCapture(cam_idxs[-1])
-    class_model = get_class_model(ws_file="./training_models/resnet.pth").eval().to(device)
+    class_model = get_class_model(ws_file="./training_models/prueba_sin_subsets.pth", device=device).eval().to(device)
     cv2.namedWindow("bar bestial", cv2.WINDOW_NORMAL)
     error = False
     game_started = False
@@ -275,34 +272,36 @@ def cv_auto(model: RLModel, num_players: Literal[2, 3, 4], game_mode: Literal["f
         elif game_started:
             frame_q = frame_q[1:-1]
 
-        hell_lbl, heaven_lbl = None, None
-        if frame_heaven is not None:
-            frame_cnts, heaven_lbl = put_labels(frame, [frame_heaven], "heaven", class_model, frame_cnts, device)
+        # hell_lbl, heaven_lbl = None, None
+        # if frame_heaven is not None:
+        #     frame_cnts, heaven_lbl = put_labels(frame, [frame_heaven], "heaven", class_model, frame_cnts, device)
         frame_cnts, q_lbls = put_labels(frame, frame_q, "q", class_model, frame_cnts, device)
-        if frame_hell is not None:
-            frame_cnts, hell_lbl = put_labels(frame, [frame_hell], "hell", class_model, frame_cnts, device)
+        # if frame_hell is not None:
+        #     frame_cnts, hell_lbl = put_labels(frame, [frame_hell], "hell", class_model, frame_cnts, device)
         frame_cnts, hand_lbls = put_labels(frame, frame_hand, "h", class_model, frame_cnts, device)
 
         if game_started and stable_frame_counter >= STABLE_FRAME_TRESHOLD:
+            # if log_error(
+            #     not bool(frame_hell) and bool(hell) or not bool(frame_heaven) and bool(heaven),
+            #     "Detection error, the hell or heaven card disapeared",
+            #     error,
+            # ):
+            #     error = True
+            #     continue
+
+            length = len([c for c in q_lbls if c not in q])
+            if log_error(length > 1, f"{length} changes have been detected in the queue which is not possible.", error):
+                error = True
+                continue
+
+            if log_error(len(hand) > 1 and not hand_lbls, "Hand cards are not being detected", error):
+                error = True
+                continue
+
             if log_error(
-                not bool(hell_lbl) and bool(hell) or not bool(heaven_lbl) and bool(heaven),
-                "Detection error, the hell or heaven card disapeared",
-                error,
-            ):
-                error = True
-                continue
-
-            l = len([c for c in q_lbls if c not in q])
-            if log_error(l > 1, f"{l} changes have been detected in the queue which is not possible.", error):
-                error = True
-                continue
-
-            if log_error(len(hand) > 1 and not hand_lbls, f"Hand cards are not being detected", error):
-                error = True
-                continue
-
-            if log_error(
-                len([c for c in hand_lbls if c not in hand]) > 1 or abs(len(hand) - len(hand_lbls)) > 1 or any([c != ai_color for c, _ in hand_lbls]),
+                len([c for c in hand_lbls if c not in hand]) > 1
+                or abs(len(hand) - len(hand_lbls)) > 1
+                or any([c != ai_color for c, _ in hand_lbls]),
                 f"The hand is not being correctly detected; hand: {hand}, hand_lbls: {hand_lbls}",
                 error,
             ):
@@ -326,7 +325,9 @@ def cv_auto(model: RLModel, num_players: Literal[2, 3, 4], game_mode: Literal["f
                         logger.info(f"updated heaven: {heaven}")
 
                     turn = (turn + 1) % num_players
-                    logger.info(f"----------The queue has been correctly updated, next turn is for player {turn}.-------------")
+                    logger.info(
+                        f"----------The queue has been correctly updated, next turn is for player {turn}.-------------"
+                    )
                     poss_hells, poss_queues, poss_heavens = None, None, None
                     agent_actions.clear()
                     played_card = None
@@ -339,6 +340,14 @@ def cv_auto(model: RLModel, num_players: Literal[2, 3, 4], game_mode: Literal["f
                     len(color_pos_map) == num_players and q_lbls[-1][0] not in color_pos_map,
                     f"""The color of the new card is being wrongly detected or there are too many players.
                             Number of players that were supposed to be: {num_players}""",
+                    error,
+                ):
+                    error = True
+                    continue
+
+                if log_error(
+                    turn < len(color_pos_map) and color_pos_map[turn] != q_lbls[-1][0],
+                    f"Is not your turn, is turn of player {turn}",
                     error,
                 ):
                     error = True
@@ -360,9 +369,36 @@ def cv_auto(model: RLModel, num_players: Literal[2, 3, 4], game_mode: Literal["f
 
                 q = q_lbls
                 queue = [Card(CardType(f), Color(c)) for c, f in q]
+                queue_cmp = queue + [None] * (QUEUE_LEN - len(queue))
                 c_hell = [Card(CardType(f), Color(c)) for c, f in hell]
                 c_heaven = [Card(CardType(f), Color(c)) for c, f in heaven]
                 poss_queues, poss_hells, poss_heavens = turn_result(queue, c_hell, c_heaven, agent_actions)
+
+                if (
+                    turn != agent_turn
+                    and any([qi == queue_cmp for qi in poss_queues])
+                    and any([qi != queue_cmp for qi in poss_queues])
+                ):
+                    print("¡¡¡ The queue might change or not depending on the human action !!!")
+                    decision = None
+                    while decision is None:
+                        yn = input("Will the queue change after your action?[y/n] ")
+                        yn = yn.lower()
+                        if yn == "y" or yn == "n":
+                            decision = yn
+                        else:
+                            print("just y/n answer")
+
+                    if decision == "y":
+                        indxs = [i for i, qi in enumerate(poss_queues) if qi != queue_cmp]
+                        poss_queues = [poss_queues[i] for i in indxs]
+                        poss_hells = [poss_hells[i] for i in indxs]
+                        poss_heavens = [poss_heavens[i] for i in indxs]
+                    else:
+                        indxs = [i for i, qi in enumerate(poss_queues) if qi == queue_cmp]
+                        poss_queues = [poss_queues[i] for i in indxs]
+                        poss_hells = [poss_hells[i] for i in indxs]
+                        poss_heavens = [poss_heavens[i] for i in indxs]
 
             elif turn == agent_turn and played_card is None:
                 assert agent_actions == []
@@ -370,7 +406,7 @@ def cv_auto(model: RLModel, num_players: Literal[2, 3, 4], game_mode: Literal["f
                     logger.info("There are no cards in hand, game has ended")
                     return
 
-                sorted_hand = sorted(hand_lbls, key=lambda l: l[1])
+                sorted_hand = sorted(hand_lbls, key=lambda x: x[1])
                 while True:
                     state = create_state_rep(
                         heaven,
@@ -389,7 +425,7 @@ def cv_auto(model: RLModel, num_players: Literal[2, 3, 4], game_mode: Literal["f
 
                     if chosen_card is None:
                         if option >= len(sorted_hand):
-                            option = choice(list(range(len(sorted_hand))))
+                            option = random.choice(list(range(len(sorted_hand))))
                         card = Card(CardType(sorted_hand[option][1]), Color(sorted_hand[option][0]))
                         played_card = sorted_hand[option]
                         logger.info(f"The AI plays {card}")
@@ -403,7 +439,7 @@ def cv_auto(model: RLModel, num_players: Literal[2, 3, 4], game_mode: Literal["f
                             [Card(CardType(f), Color(c)) for c, f in q]
                         )
                         if option not in poss_options and poss_options:
-                            option = choice(poss_options)
+                            option = random.choice(poss_options)
                         agent_actions.append(option)
 
                         # camaleon
@@ -454,14 +490,14 @@ def cv_auto(model: RLModel, num_players: Literal[2, 3, 4], game_mode: Literal["f
                 )
                 continue
 
-            if hell_lbl or heaven_lbl:
+            if frame_hell or frame_heaven:
                 logger.error(
                     "Hell or Heaven is being detected, which shouldn't be possible at start of the game. The game cannot be started."
                 )
                 continue
 
-            if (l := len(hand_lbls)) != 4:
-                logger.error(f"{l} cards detected in hand, which should be 4. The game cannot be started.")
+            if (length := len(hand_lbls)) != 4:
+                logger.error(f"{length} cards detected in hand, which should be 4. The game cannot be started.")
                 continue
 
             if any([c != hand_lbls[0][0] for c, _ in hand_lbls]):
@@ -472,176 +508,9 @@ def cv_auto(model: RLModel, num_players: Literal[2, 3, 4], game_mode: Literal["f
             color_pos_map.append(hand_lbls[0][0])
             ai_color = hand_lbls[0][0]
             logger.debug(f"color_pos_map updated: {color_pos_map}")
-            logger.debug(f"GAME STARTED: starts player {turn} (the bot is player {agent_turn})")
+            logger.info(f"GAME STARTED: starts player {turn} (the bot is player {agent_turn})")
             hand = hand_lbls
             game_started = True
-
-
-def cv_manual(model: RLModel, num_players: Literal[2, 3, 4], game_mode: Literal["full", "medium", "basic"]) -> None:
-    import cv2
-    import torch
-
-    from cv.camera import camera_idxs, put_labels
-    from cv.card_classification import get_class_model
-    from cv.card_detection import binarize_image, card_contours, card_positions, separate_cards
-
-    device = "cuda:0" if torch.cuda.is_available() else "cpu"
-    logger.info(f"Running in {device} device")
-
-    heaven, hell, q, hand, color_pos_map = [], [], [], [], []
-    chosen_card = None
-    num_cards = 12 * num_players if game_mode != "basic" else 9 * num_players
-
-    cam_idxs = camera_idxs()
-    cam = cv2.VideoCapture(cam_idxs[-1])
-    class_model = get_class_model(ws_file="./training_models/resnet.pth").eval().to(device)
-    cv2.namedWindow("bar bestial", cv2.WINDOW_NORMAL)
-    error = False
-
-    while True:
-        rval, frame = cam.read()
-
-        if not rval:
-            break
-
-        bw = binarize_image(frame)
-        cnts = card_contours(bw)
-        cnts = separate_cards(frame, cnts)
-        frame_heaven, frame_q, frame_hell, frame_hand = card_positions(cnts)
-
-        if len(frame_q) < 2:
-            if not error:
-                logger.error("Heaven door and kick cards aren't being detected")
-                error = True
-            continue
-        else:
-            # ignore heaven door and kick cards
-            frame_q = frame_q[1:-1]
-            error = False
-
-        frame_cnts = frame.copy()
-        cv2.drawContours(frame_cnts, cnts, -1, (0, 255, 0), 1)
-
-        hell_lbl, heaven_lbl = None, None
-        if frame_heaven is not None:
-            frame_cnts, heaven_lbl = put_labels(frame, [frame_heaven], "heaven", class_model, frame_cnts, device)
-        frame_cnts, q_lbls = put_labels(frame, frame_q, "q", class_model, frame_cnts, device)
-        if frame_hell is not None:
-            frame_cnts, hell_lbl = put_labels(frame, [frame_hell], "hell", class_model, frame_cnts, device)
-        frame_cnts, hand_lbls = put_labels(frame, frame_hand, "h", class_model, frame_cnts, device)
-
-        key = cv2.pollKey()
-        if key == 27:  # escape
-            break
-        elif key == 13:  # intro
-            # after all the movements are made in the board but opening heaven's doors
-            # so if there are five cards in queue the first 2 will enter heaven and the last goes to hell
-            if (l := len([c for c in q_lbls if c not in q])) > 1:
-                logger.error(
-                    f"""{l} new cards have been detected in the queue, which
-                means 2 or more turns have passed since last state actualization or
-                there has been a detection error
-                previous queue: {q}, new queue: {q_lbls}"""
-                )
-                continue
-
-            if (l := len([c for c in hand_lbls if c not in hand])) > 1 and hand:
-                logger.error(
-                    f"""{l} new cards have been detected in the hand, which
-                means 2 or more turns have passed since last state actualization or
-                there has been a detection error
-                previous hand: {hand}, new hand: {hand_lbls}"""
-                )
-                continue
-
-            if (heaven_lbl and not heaven) or (heaven_lbl and heaven_lbl[0] not in heaven):
-                logger.error(
-                    """Change in heaven detected, if the heaven's door have
-                been opened please actualize the state BEFORE that, when all movements
-                on the queue have been made but all the five cards are still in it"""
-                )
-                continue
-
-            if not hell_lbl and hell or not heaven_lbl and heaven:
-                logger.error("Detection error, the hell or heaven card disapeared")
-                continue
-
-            if len(q_lbls) == 5:
-                heaven.extend(q_lbls[:2])
-                hell.append(q_lbls[-1])
-                new_heaven_cards = list(map(lambda x: Card(CardType(x[1]), Color(x[0])), q_lbls[:2]))
-                new_hell_card = Card(CardType(q_lbls[-1][1]), Color(q_lbls[-1][0]))
-                logger.info(f"{new_heaven_cards} enter in heaven")
-                logger.info(f"{new_hell_card} goes to hell")
-                q = q_lbls[2:-1]
-            elif (hell_lbl and not hell) or (hell_lbl and hell_lbl[0] not in hell):
-                new_hell_cards = [c for c in q if c not in q_lbls]
-                if hell_lbl[0] not in new_hell_cards:
-                    new_hell_cards.append(hell_lbl[0])
-                hell.extend(new_hell_cards)
-                logger.info(f"{new_hell_cards} went to hell")
-                hand = hand_lbls
-                q = q_lbls
-            else:
-                hand = hand_lbls
-                q = q_lbls
-
-            if len(color_pos_map) < num_players:
-                ai_color = hand[0][0]
-                color_pos_map = list(set([c for c, _ in heaven + q + hell if c != ai_color]))
-                color_pos_map.insert(0, ai_color)
-
-            hand.sort(key=lambda x: x[1])
-            while True:
-                state = create_state_rep(
-                    heaven,
-                    hell,
-                    q,
-                    hand,
-                    color_pos_map,
-                    chosen_card=chosen_card,
-                    num_players=num_players,
-                    game_mode=game_mode,
-                )
-
-                if state[1:].sum() == num_cards:
-                    print("game has ended, count cards in heaven to see the winner")
-                    return
-
-                logger.debug(state)
-                action, _ = model.predict(state)
-                print(f"The AI chooses action {action}")
-
-                if chosen_card is None:
-                    card = Card(CardType(hand[action][1]), Color(hand[action][0]))
-                    print(f"The AI plays {card}")
-
-                    if card.has_options():
-                        chosen_card = hand.pop(action)
-                    else:
-                        chosen_card = None
-                        break
-                else:
-                    # camaleon
-                    if chosen_card[1] == 5:
-                        action = min(action, len(q))
-                        card = Card(CardType(q[action][1]), Color(q[action][0]))
-                        print(f"The camaleon transforms into {card}")
-                        if card.has_options():
-                            chosen_card = q[action]
-                        else:
-                            chosen_card = None
-                            break
-                    else:
-                        match chosen_card[1]:
-                            case 3:
-                                print(f"the canguro jumps {action} cards")
-                            case 2:
-                                print(f"the loro scares the card in position {action}")
-                        chosen_card = None
-                        break
-
-        cv2.imshow("bar bestial", frame_cnts)
 
 
 def main():
@@ -654,24 +523,18 @@ def main():
         help="File of the model to load in human vs AI option",
     )
     parser.add_argument(
-        "--agent1-class",
+        "--algs",
         type=str,
         choices=["DQN", "PPO", "QRDQN", "TRPO"],
-        default="DQN",
-        help='First agent\'s class ["DQN", "PPO", "QRDQN", "TRPO"], this argument is ignored if --agent argument is not defined',
-    )
-    parser.add_argument(
-        "--agent2-class",
-        type=str,
-        choices=["DQN", "PPO", "QRDQN", "TRPO"],
-        default="DQN",
-        help='Second agent\'s class ["DQN", "PPO", "QRDQN", "TRPO"], this argument is ignored if --agent-v-agent is not defined',
+        nargs="+",
+        metavar="LIST OF ALGORITHMS",
+        help='The agent\'s algorithm ["DQN", "PPO", "QRDQN", "TRPO"]',
     )
     parser.add_argument(
         "--agent-v-agent",
         type=str,
-        metavar=("AGENT1", "AGENT2"),
-        nargs=2,
+        metavar="LIST OF AGENTS",
+        nargs="+",
         default=None,
         help="AI vs AI option, they play a total of num-games games and prints the results",
     )
@@ -702,29 +565,18 @@ def main():
         use as input for the model in real time, if this argument is defined only one agent is available to play,
         the rest must be humans. The turn is detected automatically.""",
     )
-    parser.add_argument(
-        "--cv-manual",
-        action="store_true",
-        help="""Uses a webcam and CV to detect the cards in the board and create the board state to
-        use as input for the model in real time, if this argument is defined only one agent is available to play,
-        the rest must be humans. At the end of every turn (AI included) the intro button must be pressed.""",
-    )
-    parser.add_argument(
-        "--debug",
-        action="store_true",
-        help="Set logging level to debug"
-    )
+    parser.add_argument("--debug", action="store_true", help="Set logging level to debug")
 
     args = parser.parse_args()
     model = None
 
     if args.agent_v_agent:
-        model1 = load_model(args.agent_v_agent[0], args.agent1_class)
-        model2 = load_model(args.agent_v_agent[1], args.agent2_class)
+        assert len(args.agent_v_agent) == args.num_players and len(args.algs) == args.num_players
+        models = [load_model(args.agent_v_agent[i], args.algs[i]) for i in range(args.num_players)]
         env = BarEnv(num_players=args.num_players, game_mode=args.game_mode)
-        wins1, wins2, draws = model_v_model(model1, model2, args.num_games, env)
-        print(f"Model1: {args.agent_v_agent[0]} wins {wins1} times.")
-        print(f"Model2: {args.agent_v_agent[1]} wins {wins2} times.")
+        wins, draws = model_v_model(models, args.num_games, env)
+        for w, name in zip(wins, args.agent_v_agent):
+            print(f"Model1: {name} wins {w} times.")
         print(f"They draw {draws} times.")
         exit(0)
 
@@ -732,12 +584,7 @@ def main():
     logging.basicConfig(level=level)
 
     if args.agent:
-        model = load_model(args.agent, args.agent1_class)
-
-    if args.cv_manual:
-        assert model is not None, "--agent must be defined to play"
-        cv_manual(model, args.num_players, args.game_mode)
-        exit(0)
+        model = load_model(args.agent, args.algs[0])
 
     if args.cv_auto:
         assert model is not None, "--agent must be defined to play"

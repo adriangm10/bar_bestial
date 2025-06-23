@@ -25,6 +25,7 @@ def model_v_random(
     wins = 0
     losses = 0
     draws = 0
+    position = 0
 
     for _ in range(num_games):
         obs, _ = env.reset()
@@ -44,9 +45,47 @@ def model_v_random(
                     wins += 1
                 else:
                     losses += 1
+
+                game = env.game
+                players_heaven = [[c for c in game.heaven if c.color.value == col] for col in range(game.num_players)]
+                players_heaven = [cs for cs in players_heaven if len(cs) > 0]
+                players_heaven = sorted(players_heaven, key=lambda cs: len(cs), reverse=True)
+
+                if not players_heaven:
+                    break
+
+                positions = [[players_heaven[0]]]
+                prev_len = len(players_heaven[0])
+                for i in players_heaven[1:]:
+                    if len(i) == prev_len:
+                        positions[-1].append(i)
+                    else:
+                        positions.append([i])
+
+                curr_pos = 1
+                for i, pos in enumerate(positions):
+                    if len(pos) == 1:
+                        if pos[0][0].color == env.agent_color:
+                            position += curr_pos
+                            break
+                        else:
+                            curr_pos += 1
+                    else:
+                        sorted_pos = sorted(pos, key=lambda x: sum([c.value for c in x]))
+                        prev_value = sum([c.value for c in sorted_pos[0]])
+                        for i in sorted_pos:
+                            value = sum([c.value for c in i])
+                            if prev_value != value:
+                                curr_pos += 1
+                            prev_value = value
+
+                            if i[0].color == env.agent_color:
+                                position += curr_pos
+                                break
                 break
 
-    return wins, losses, draws
+
+    return wins, losses, draws, position
 
 
 class SelfPlayCallback(BaseCallback):
@@ -80,7 +119,7 @@ class SelfPlayCallback(BaseCallback):
         if self.stats_file_name:
             self.stats_file = open(self.stats_file_name, self.stats_file_mode)
             if self.stats_file_mode != "a":
-                self.stats_file.write("episode,wins,losses,draws\n")
+                self.stats_file.write("episode,wins,losses,draws,position\n")
 
     def _on_step(self) -> bool:
         if self.locals.get("done"):
@@ -93,7 +132,7 @@ class SelfPlayCallback(BaseCallback):
                     print(f"Updated opponent model at episode {self.episodes}")
 
             if self.episodes % self.evaluate_after_n_episodes == 0:
-                wins, losses, draws = model_v_random(
+                wins, losses, draws, position = model_v_random(
                     self.model,
                     num_games=1000,
                     game_mode=self.env.game_mode,
@@ -103,10 +142,10 @@ class SelfPlayCallback(BaseCallback):
                 )
 
                 if self.verbose > 0:
-                    print(f"Stats against random actions: {{ wins: {wins}, losses: {losses}, draws: {draws} }}")
+                    print(f"Stats against random actions: {{ wins: {wins}, losses: {losses}, draws: {draws}, position: {position} }}")
 
                 if self.stats_file_name:
-                    self.stats_file.write(f"{self.episodes},{wins},{losses},{draws}\n")
+                    self.stats_file.write(f"{self.episodes},{wins},{losses},{draws},{position}\n")
 
             if self.checkpoints_dir and self.episodes % self.save_checkpoint_after_n_episodes == 0:
                 self.model.save(self.checkpoints_dir + f"/model_episode{self.episodes}")
@@ -186,28 +225,28 @@ if __name__ == "__main__":
     )
 
     args = parser.parse_args()
-    env = BarEnv(game_mode=args.game_mode, self_play=True, t=1, num_players=args.num_players, transfer_learning=None)
+    env = BarEnv(game_mode=args.game_mode, self_play=True, t=1, num_players=args.num_players, transfer_learning=4)
 
-    model = (
-        algorithms[args.alg].load(args.continue_training)
-        if args.continue_training
-        else algorithms[args.alg]("MlpPolicy", env, verbose=0)
-    )
+    if args.continue_training:
+        model = algorithms[args.alg].load(args.continue_training)
+        model.set_env(env)
+    else:
+        model = algorithms[args.alg]("MlpPolicy", env, verbose=0)
 
-    selfplay_callback = SelfPlayCallback(
-        env,
-        update_after_n_episodes=1000,
-        verbose=1,
-        evaluate_after_n_episodes=25_000,
-        stats_file=args.stats_file,
-        stats_file_mode="w" if args.continue_training is None else "a",
-        transfer_learning=None,
-        checkpoints_dir=args.checkpoints_dir,
-    )
-    model.learn(total_timesteps=args.num_timesteps, callback=selfplay_callback, reset_num_timesteps=False)
+    # selfplay_callback = SelfPlayCallback(
+    #     env,
+    #     update_after_n_episodes=1000,
+    #     verbose=1,
+    #     evaluate_after_n_episodes=25_000,
+    #     stats_file=args.stats_file,
+    #     stats_file_mode="w" if args.continue_training is None else "a",
+    #     transfer_learning=4,
+    #     checkpoints_dir=args.checkpoints_dir,
+    # )
+    # model.learn(total_timesteps=args.num_timesteps, callback=selfplay_callback, reset_num_timesteps=False)
 
-    model.save(args.save_model_file)
+    # model.save(args.save_model_file)
 
     # model = DQN.load("models/dqn/t1p2finaldqn")
-    wins, losses, draws = model_v_random(model, num_games=1000, game_mode=args.game_mode, t=1, num_players=2)
-    print(f"wins: {wins}, losses: {losses}, draws: {draws}")
+    wins, losses, draws, position = model_v_random(model, num_games=1000, game_mode=args.game_mode, t=1, num_players=args.num_players, transfer_learning=4)
+    print(f"wins: {wins}, losses: {losses}, draws: {draws}, position: {position}")
