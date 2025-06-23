@@ -446,6 +446,8 @@ class Card:
         return self.card_type.has_options()
 
     def __eq__(self, o) -> bool:
+        if o is None:
+            return False
         if self.__class__ == o.__class__:
             return self.card_type == o.card_type and self.color == o.color
         raise ValueError("Error comparing " + str(self.__class__) + " with " + str(o.__class__))
